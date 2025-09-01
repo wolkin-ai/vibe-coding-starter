@@ -1,0 +1,65 @@
+---
+description: "Vibeコーディング（AI支援プログラミング）特化ガイド"
+globs: src/**/*.ts,src/**/*.tsx,App.tsx,main.tsx
+alwaysApply: false
+---
+
+# Vibeコーディング特化ガイド
+
+## 🎯 AIプロンプトのベストプラクティス
+
+### 1. 具体的な場所を指定する
+```
+❌ 悪い例: "todoリストに統計機能を追加"
+✅ 良い例: "src/features/todo/components/に統計コンポーネントを追加"
+```
+
+### 2. 既存パターンを参照する
+```
+✅ "todoと同じパターンでprofile機能を作成"
+✅ "TodoFormコンポーネントと同様の構造でUserFormを作成"
+```
+
+### 3. 制約を明確にする
+```
+✅ "型安全で、zodバリデーション付きで、React Query使用"
+```
+
+## 🚀 開発フロー
+
+### 新機能開発の手順
+1. `features/` 配下に機能フォルダ作成
+2. `schema.ts` でバリデーション定義
+3. `types.ts` で型定義
+4. `api.ts` でCRUD実装
+5. `hooks.ts` でReact Query統合
+6. `components/` でUI実装
+7. `app/` でページ統合
+
+### よくある質問と回答
+
+**Q: 新しいUIコンポーネントはどこに置く？**
+A: 複数機能で使う場合は `src/shared/ui/`、特定機能のみなら `src/features/<feature>/components/`
+
+**Q: APIエラーハンドリングはどこで？**
+A: 基本は `api.ts` で throw、UIレベルでは React Query の error ステートを使用
+
+**Q: 環境変数を追加したい**
+A: `src/shared/lib/env.ts` の zodスキーマに追加し、型安全にアクセス
+
+**Q: グローバルな定数を追加したい**
+A: `src/shared/config.ts` の AppConfig オブジェクトに追加
+
+## 💡 Vibeコーディングのコツ
+
+1. **段階的に進める**: 大きな機能は小さく分割
+2. **パターンを再利用**: 既存の todo 実装を参考に
+3. **型安全を重視**: 実行時エラーよりコンパイルエラーを選ぶ
+4. **シンプルさを保つ**: 複雑すぎる実装は避ける
+
+## 📚 参考ファイル
+
+既存の実装を参考にする場合:
+- **Todo機能**: `src/features/todo/` (完全な実装例)
+- **UIコンポーネント**: `src/shared/ui/` (Button, Input, Card)
+- **設定ファイル**: `src/shared/lib/env.ts`, `src/shared/config.ts`

@@ -1,0 +1,92 @@
+---
+description: "Vibe Coding Starter - Feature-first Lite アーキテクチャルール"
+globs: src/**/*.ts,src/**/*.tsx,App.tsx,main.tsx
+alwaysApply: false
+---
+
+# Vibe Coding Starter - アーキテクチャルール
+
+このプロジェクトはVibeコーディング（AI支援プログラミング）を学ぶ初心者向けのテンプレートです。
+Feature-first Liteアーキテクチャに従って開発を行ってください。
+
+## 🏗️ ディレクトリ構造
+
+```
+src/
+  app/           # ページとルーティング（UIの出口）
+  features/      # 機能ごとのフォルダ（メインワークスペース）
+    <feature>/
+      api.ts      # Supabase API呼び出し
+      hooks.ts    # React Query hooks
+      schema.ts   # Zodバリデーション
+      types.ts    # TypeScript型定義
+      components/ # この機能専用のUIコンポーネント
+      index.ts    # 機能のエクスポート
+  shared/        # 共通のコンポーネント・ライブラリ
+    ui/          # Button, Input, Cardなどの再利用可能UI
+    lib/         # env.ts, supabase.ts, utils.ts
+    config.ts    # グローバル定数
+    types/       # 共通型定義
+```
+
+## 🚫 絶対禁止ルール
+
+### 1. ハードコーディング禁止
+- 環境変数は `src/shared/lib/env.ts` 経由でのみアクセス
+- 定数は `src/shared/config.ts` に集約
+- 直接の文字列・数値埋め込みは禁止
+
+### 2. any型の使用禁止
+- `@typescript-eslint/no-explicit-any: error` で強制
+- 不明な型は `unknown` を使用し、適切に型ガードを実装
+
+### 3. データベース直アクセス禁止
+- Supabaseクライアントはコンポーネントで直接使用禁止
+- 必ず `features/*/api.ts` 経由でアクセス
+- React Queryの `features/*/hooks.ts` を使用
+
+## ✅ 推奨パターン
+
+### 新機能追加の手順
+1. `src/features/<feature-name>/` フォルダを作成
+2. ファイルを順番に作成:
+   - `types.ts` - Supabase型とビジネスロジック型
+   - `schema.ts` - Zodバリデーションスキーマ
+   - `api.ts` - CRUD操作とエラーハンドリング
+   - `hooks.ts` - React Query hooks
+   - `components/` - UI コンポーネント
+   - `index.ts` - 外部公開API
+3. `src/app/` にページコンポーネントを作成
+
+### コンポーネント作成パターン
+```typescript
+// ✅ 良い例
+import React from 'react';
+import { useTodos } from '@/features/todo/hooks';
+import { Button, Input } from '@/shared/ui';
+
+export function TodoForm() {
+  const { data, isLoading } = useTodos();
+  // ...
+}
+
+// ❌ 悪い例
+import { supabase } from '@/shared/lib/supabase'; // 直接インポート禁止
+```
+
+### API関数の例
+```typescript
+// features/todo/api.ts
+export async function fetchTodos(): Promise<Todo[]> {
+  const { data, error } = await supabase
+    .from('todos')
+    .select('*')
+    .order('created_at', { ascending: false });
+  
+  if (error) {
+    throw new Error(`Failed to fetch todos: ${error.message}`);
+  }
+  
+  return data ?? [];
+}
+```

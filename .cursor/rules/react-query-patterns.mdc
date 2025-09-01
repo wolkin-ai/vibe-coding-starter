@@ -1,0 +1,160 @@
+---
+description: "React Query とSupabaseを使ったデータフェッチパターン"
+globs: src/features/**/*.ts,src/features/**/*.tsx
+alwaysApply: false
+---
+
+# React Query & Supabase パターン
+
+## 🔄 データフェッチパターン
+
+### API層の実装 (api.ts)
+```typescript
+import { supabase } from '@/shared/lib/supabase';
+import { todoInputSchema } from './schema';
+import type { Todo, TodoInsert } from './types';
+
+export async function listTodos(): Promise<Todo[]> {
+  const { data: user } = await supabase.auth.getUser();
+  
+  if (!user.user) {
+    throw new Error('User not authenticated');
+  }
+
+  const { data, error } = await supabase
+    .from('todos')
+    .select('*')
+    .eq('user_id', user.user.id)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    throw new Error(`Failed to fetch todos: ${error.message}`);
+  }
+
+  return data ?? [];
+}
+
+export async function addTodo(input: unknown): Promise<Todo> {
+  const validatedInput = todoInputSchema.parse(input);
+  
+  const { data: user } = await supabase.auth.getUser();
+  if (!user.user) {
+    throw new Error('User not authenticated');
+  }
+
+  const { data, error } = await supabase
+    .from('todos')
+    .insert({ 
+      title: validatedInput.title, 
+      user_id: user.user.id 
+    })
+    .select()
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to add todo: ${error.message}`);
+  }
+
+  return data;
+}
+```
+
+### React Query フック (hooks.ts)
+```typescript
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { addTodo, listTodos } from './api';
+
+const TODO_QUERY_KEY = ['todos'] as const;
+
+export function useTodos() {
+  return useQuery({
+    queryKey: TODO_QUERY_KEY,
+    queryFn: listTodos,
+    staleTime: 1000 * 60 * 2, // 2 minutes
+  });
+}
+
+export function useAddTodo() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: addTodo,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: TODO_QUERY_KEY });
+    },
+    onError: (error) => {
+      console.error('Failed to add todo:', error);
+    },
+  });
+}
+```
+
+## 🛡️ エラーハンドリング
+
+### API層での統一エラーハンドリング
+```typescript
+// 必ずエラーメッセージ付きでthrow
+if (error) {
+  throw new Error(`Failed to fetch todos: ${error.message}`);
+}
+
+// 認証チェック
+const { data: user } = await supabase.auth.getUser();
+if (!user.user) {
+  throw new Error('User not authenticated');
+}
+```
+
+### UI層でのエラー表示
+```typescript
+export function TodoList() {
+  const { data, isLoading, error } = useTodos();
+
+  if (isLoading) return <LoadingSpinner />;
+  
+  if (error) {
+    return (
+      <div className="rounded-lg border border-red-200 bg-red-50 p-4">
+        <p className="text-sm text-red-600">
+          Failed to load todos. Please try again.
+        </p>
+      </div>
+    );
+  }
+
+  return <div>{/* 正常時のUI */}</div>;
+}
+```
+
+## ⚡ 最適化パターン
+
+### オプティミスティック更新
+```typescript
+export function useToggleTodo() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: ({ id, completed }: { id: string; completed: boolean }) =>
+      updateTodo(id, { completed }),
+    onMutate: async ({ id, completed }) => {
+      await queryClient.cancelQueries({ queryKey: TODO_QUERY_KEY });
+      
+      const previousTodos = queryClient.getQueryData(TODO_QUERY_KEY);
+      
+      queryClient.setQueryData(TODO_QUERY_KEY, (old: unknown) => {
+        if (!Array.isArray(old)) return old;
+        return old.map((todo) =>
+          todo.id === id ? { ...todo, completed } : todo,
+        );
+      });
+      
+      return { previousTodos };
+    },
+    onError: (err, variables, context) => {
+      if (context?.previousTodos) {
+        queryClient.setQueryData(TODO_QUERY_KEY, context.previousTodos);
+      }
+    },
+  });
+}
+```

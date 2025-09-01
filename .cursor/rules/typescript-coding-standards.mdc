@@ -1,0 +1,78 @@
+---
+description: "TypeScript コーディング規約とベストプラクティス"
+globs: src/**/*.ts,src/**/*.tsx,App.tsx,main.tsx
+alwaysApply: false
+---
+# TypeScript コーディング規約
+
+## 📝 基本ルール
+
+### TypeScript設定
+- `strict: true` モード必須
+- `exactOptionalPropertyTypes: true` 使用
+- インポートは型インポートを優先: `import type { ... }`
+
+### 命名規約
+- **コンポーネント**: PascalCase (`TodoForm.tsx`)
+- **変数/関数**: camelCase (`fetchTodos`, `isLoading`)
+- **定数**: UPPER_SNAKE_CASE (`DEFAULT_PAGE_SIZE`)
+- **型/インターフェース**: PascalCase (`TodoInput`, `ApiResponse`)
+
+## 🎯 React パターン
+
+### コンポーネント
+- 関数コンポーネントのみ使用
+- hooks のルールを厳守
+- props は interface で型定義
+
+```typescript
+interface TodoFormProps {
+  onSubmit: (data: TodoInput) => void;
+  isLoading?: boolean;
+}
+
+export function TodoForm({ onSubmit, isLoading = false }: TodoFormProps) {
+  // 実装
+}
+```
+
+### バリデーション
+```typescript
+// schema.ts
+import { z } from 'zod';
+
+export const todoInputSchema = z.object({
+  title: z.string().min(1).max(100),
+});
+
+export type TodoInput = z.infer<typeof todoInputSchema>;
+```
+
+## 🎨 スタイリング
+
+### Tailwind CSS
+- Tailwind CSS のみ使用
+- カスタムCSS は `src/styles/globals.css` のみ
+- クラス名の結合は `cn()` ユーティリティを使用
+
+```typescript
+import { cn } from '@/shared/lib/utils';
+
+<div className={cn('base-class', { 'active-class': isActive }, className)} />
+```
+
+## 📦 インポート順序
+
+```typescript
+// 1. React/Node modules
+import React from 'react';
+import { z } from 'zod';
+
+// 2. Internal imports (with @/ alias)
+import { Button } from '@/shared/ui';
+import { useTodos } from '@/features/todo/hooks';
+
+// 3. Relative imports
+import './styles.css';
+import type { LocalType } from './types';
+```
