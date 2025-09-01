@@ -1,0 +1,225 @@
+---
+description: "Git ワークフローとコミット規約"
+globs: .gitignore,.husky/*,package.json,README.md,CONTRIBUTING.md
+alwaysApply: false
+---
+
+# Git ワークフローとコミット規約
+
+## 基本原則
+
+**重要**: コミット前チェック（lint-staged）でエラーが発生した場合、絶対に無理やりスキップしてはいけません。
+
+## コミット前チェックの厳守
+
+### ❌ 絶対禁止
+```bash
+# これらのコマンドは絶対に使用禁止
+git commit --no-verify           # pre-commitフックをスキップ
+git commit -n                    # 同上
+git push --force                 # 強制プッシュ
+```
+
+### ✅ 正しい対応
+lint-stagedでエラーが発生した場合：
+
+1. **エラー内容を確認**
+   ```bash
+   npm run lint        # ESLintエラーを確認
+   npm run typecheck   # TypeScriptエラーを確認
+   ```
+
+2. **エラーを修正**
+   ```bash
+   npm run lint:fix    # 自動修正可能なものを修正
+   # 手動でその他のエラーを修正
+   ```
+
+3. **再度ステージング**
+   ```bash
+   git add .
+   git commit -m "fix: resolve linting errors"
+   ```
+
+## Conventional Commits 規約
+
+### フォーマット
+```
+<type>(<scope>): <description>
+
+[optional body]
+
+[optional footer(s)]
+```
+
+### Type 一覧
+```
+feat:     新機能
+fix:      バグ修正
+docs:     ドキュメント更新
+style:    コードスタイル（機能に影響しない）
+refactor: リファクタリング
+test:     テスト追加・修正
+chore:    ビルドプロセス、ツール設定
+```
+
+### Scope 例（Vibe Coding Starter固有）
+```
+feat(todo):       Todo機能
+fix(auth):        認証関連
+docs(readme):     README更新
+style(ui):        UIコンポーネント
+refactor(hooks):  React Queryフック
+chore(deps):      依存関係更新
+```
+
+### 良いコミットメッセージ例
+```bash
+feat(todo): add priority field to todo items
+fix(auth): resolve session timeout issue
+docs: update installation guide for beginners
+style(button): improve hover animation
+refactor(api): extract common error handling
+test(todo): add unit tests for todo validation
+chore(deps): update react-query to v5.17.19
+```
+
+### 悪いコミットメッセージ例
+```bash
+# ❌ 具体性不足
+git commit -m "fix stuff"
+git commit -m "update"
+git commit -m "refactored"
+
+# ❌ 日本語（英語推奨）
+git commit -m "Todoの機能を追加"
+
+# ❌ 冗長すぎる
+git commit -m "I added a new feature that allows users to create todo items with priorities"
+```
+
+## Git ワークフロー
+
+### 1. 基本的な作業フロー
+```bash
+# 1. 作業開始
+git checkout -b feature/new-todo-feature
+
+# 2. 開発作業
+# ... コード編集 ...
+
+# 3. ステージング
+git add .
+
+# 4. 差分確認（推奨）
+git diff --cached | cat
+
+# 5. コミット（lint-stagedが自動実行）
+git commit -m "feat(todo): add due date functionality"
+
+# 6. プッシュ
+git push origin feature/new-todo-feature
+```
+
+### 2. ブランチ命名規則
+```
+feature/功能名     # 新機能
+fix/バグ名         # バグ修正
+docs/ドキュメント名 # ドキュメント
+chore/作業内容     # 雑務
+```
+
+例：
+```
+feature/todo-priority
+fix/auth-session-bug
+docs/installation-guide
+chore/update-dependencies
+```
+
+## エラー対応フロー
+
+### lint-stagedエラーの場合
+```bash
+# エラー発生時の表示例
+✖ eslint --fix:
+  /src/features/todo/api.ts
+    ✖ 1:1  error  'any' type is not allowed  @typescript-eslint/no-explicit-any
+
+# 対応手順
+1. ファイルを開いて該当行を修正
+2. git add . で再度ステージング
+3. git commit で再試行
+```
+
+### TypeScriptエラーの場合
+```bash
+# エラー確認
+npm run typecheck
+
+# 型エラーを修正後
+git add .
+git commit -m "fix: resolve typescript errors"
+```
+
+### マージ時の注意
+```bash
+# メインブランチへのマージ前
+git checkout main
+git pull origin main
+git checkout feature/your-branch
+git rebase main  # conflictがあれば解決
+
+# テストとlintを再実行
+npm run lint
+npm run typecheck
+npm run build
+
+# 問題なければマージ
+```
+
+## 品質ゲート
+
+### コミット前に必ず通過する項目
+1. ✅ ESLint（`@typescript-eslint/no-explicit-any: error`含む）
+2. ✅ Prettier自動整形
+3. ✅ TypeScript型チェック（implicitに）
+4. ✅ Feature-first アーキテクチャ遵守
+
+### プッシュ前の推奨チェック
+```bash
+npm run build     # ビルド確認
+npm run lint      # Lint確認
+npm run typecheck # 型チェック確認
+```
+
+## 緊急時の対応
+
+### どうしてもコミットが必要な場合
+```bash
+# 1. 一時的にファイルをstash
+git stash
+
+# 2. 最小限の修正をコミット
+git add <重要なファイルのみ>
+git commit -m "fix: critical hotfix"
+
+# 3. stashした変更を戻して修正
+git stash pop
+# エラー修正後、再度コミット
+```
+
+### 絶対にしてはいけないこと
+- `--no-verify`でlint-stagedをスキップ
+- any型を使ってエラー回避
+- Feature-firstアーキテクチャ違反
+- ハードコーディングでエラー回避
+
+## メモリ項目
+
+AIアシスタントは以下を記憶すること：
+- ユーザーがコミット品質を重視していること
+- lint-stagedエラーの強制スキップは禁止
+- Conventional Commits形式の遵守
+- Feature-first アーキテクチャの維持
+- TypeScript strict mode の厳守

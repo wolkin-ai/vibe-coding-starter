@@ -50,8 +50,9 @@
   },
   "lint-staged": {
     "*.{ts,tsx}": [
-      "eslint --fix",
-      "prettier --write"
+      "eslint --fix --max-warnings 0",
+      "prettier --write",
+      "bash -c 'npm run typecheck'"
     ],
     "*.{json,md,css}": [
       "prettier --write"
