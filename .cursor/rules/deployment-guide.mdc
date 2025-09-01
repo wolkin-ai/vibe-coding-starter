@@ -1,9 +1,7 @@
 ---
 description: "Vibe Coding Starter デプロイメントガイド（Vercel + 本番環境）"
-globs: .vercel/**,vercel.json,package.json,.env*
 alwaysApply: false
 ---
-
 # 🚀 Vibe Coding Starter デプロイメントガイド
 
 このガイドでは、Vibe Coding StarterプロジェクトをVercelを使って本番環境にデプロイする手順を説明します。
