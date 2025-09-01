@@ -1,47 +1,47 @@
-# 🤝 Contributing to Vibe Coding Starter
+# 🤝 Vibe Coding Starter への貢献
 
-This guide helps both **human developers** and **AI assistants** contribute to this project effectively.
+このガイドは、**人間の開発者**と**AIアシスタント**の両方がこのプロジェクトに効果的に貢献するためのものです。
 
-## 🎯 Core Principles
+## 🎯 基本原則
 
-1. **Feature-first organization** - Group by features, not file types
-2. **Type safety** - TypeScript strict mode, no `any` allowed
-3. **Consistency** - Follow established patterns
-4. **Simplicity** - Prefer simple, readable solutions
-5. **AI-friendly** - Clear structure that AI can understand and extend
+1. **Feature-first組織** - ファイルタイプではなく機能でグループ化
+2. **型安全性** - TypeScript strict mode、`any`は禁止
+3. **一貫性** - 確立されたパターンに従う
+4. **シンプルさ** - シンプルで読みやすいソリューションを優先
+5. **AI対応** - AIが理解・拡張できる明確な構造
 
-## 📁 Project Structure Rules
+## 📁 プロジェクト構造ルール
 
-### Directory Organization
+### ディレクトリ構成
 
 ```
 src/
-  app/                 # ✅ Pages and routing only
-  features/            # ✅ Feature-specific code (main workspace)
+  app/                 # ✅ ページとルーティングのみ
+  features/            # ✅ 機能固有のコード（メインワークスペース）
     <feature-name>/
-      components/      # UI components for this feature
-      api.ts          # Database/API calls (Supabase)
-      hooks.ts        # React Query hooks
-      schema.ts       # Validation schemas (zod)
-      types.ts        # TypeScript type definitions
-      index.ts        # Feature exports
-  shared/             # ✅ Shared utilities and components
-    ui/               # Reusable UI components
-    lib/              # Utilities and configuration
-    config.ts         # Global constants (NO hardcoding elsewhere)
-    types/            # Shared type definitions
+      components/      # この機能のUIコンポーネント
+      api.ts          # データベース/API呼び出し（Supabase）
+      hooks.ts        # React Queryフック
+      schema.ts       # バリデーションスキーマ（zod）
+      types.ts        # TypeScript型定義
+      index.ts        # 機能のエクスポート
+  shared/             # ✅ 共有ユーティリティとコンポーネント
+    ui/               # 再利用可能なUIコンポーネント
+    lib/              # ユーティリティと設定
+    config.ts         # グローバル定数（他の場所でハードコーディング禁止）
+    types/            # 共有型定義
 ```
 
-### ✅ What Goes Where
+### ✅ 何をどこに置くか
 
-| File Type     | Location                | Purpose                                     |
-| ------------- | ----------------------- | ------------------------------------------- |
-| Pages         | `src/app/`              | Route components, layout, navigation        |
-| Feature logic | `src/features/*/`       | Business logic, feature-specific components |
-| Reusable UI   | `src/shared/ui/`        | Button, Input, Card, etc.                   |
-| Configuration | `src/shared/lib/env.ts` | Environment variables (zod-validated)       |
-| Constants     | `src/shared/config.ts`  | Global constants and settings               |
-| Types         | `src/shared/types/`     | Shared type definitions                     |
+| ファイルタイプ | 場所                    | 目的                                             |
+| -------------- | ----------------------- | ------------------------------------------------ |
+| ページ         | `src/app/`              | ルートコンポーネント、レイアウト、ナビゲーション |
+| 機能ロジック   | `src/features/*/`       | ビジネスロジック、機能固有のコンポーネント       |
+| 再利用可能UI   | `src/shared/ui/`        | Button、Input、Cardなど                          |
+| 設定           | `src/shared/lib/env.ts` | 環境変数（zod検証済み）                          |
+| 定数           | `src/shared/config.ts`  | グローバル定数と設定                             |
+| 型             | `src/shared/types/`     | 共有型定義                                       |
 
 ## 🔒 Strict Rules (Never Break These)
 
