@@ -1,0 +1,316 @@
+---
+description: "Vibe Coding Starter デプロイメントガイド（Vercel + 本番環境）"
+globs: .vercel/**,vercel.json,package.json,.env*
+alwaysApply: false
+---
+
+# 🚀 Vibe Coding Starter デプロイメントガイド
+
+このガイドでは、Vibe Coding StarterプロジェクトをVercelを使って本番環境にデプロイする手順を説明します。
+
+## 📋 前提条件
+
+- ✅ プロジェクトがGitHubにプッシュ済み
+- ✅ Supabaseプロジェクトが作成済み
+- ✅ ローカルで動作確認済み
+- ✅ `.env.local`で環境変数設定済み
+
+## 🌐 Vercelデプロイ手順
+
+### ステップ1: Vercel CLIのインストール
+
+```bash
+# Vercel CLIをグローバルにインストール
+npm install -g vercel@latest
+
+# バージョン確認
+vercel --version
+```
+
+### ステップ2: Vercelログイン
+
+```bash
+# GitHubアカウントでログイン
+vercel login
+# ブラウザが開くのでGitHubで認証
+```
+
+### ステップ3: プロジェクトデプロイ
+
+```bash
+# プロジェクトルートで実行
+vercel --prod
+
+# 設定質問への回答例：
+# ? Set up and deploy? → yes
+# ? Which scope? → あなたのアカウントを選択
+# ? Link to existing project? → no（新規の場合）
+# ? Project name? → vibe-coding-starter
+# ? In which directory is your code located? → ./
+```
+
+### ステップ4: 自動検出される設定
+
+Vercelが自動的に以下を検出します：
+
+```yaml
+Framework: Vite
+Build Command: vite build
+Development Command: vite --port $PORT
+Install Command: npm install
+Output Directory: dist
+```
+
+## 🔧 環境変数の設定（重要！）
+
+デプロイ後、Vercelダッシュボードで環境変数を設定する必要があります。
+
+### Vercelダッシュボードでの設定
+
+1. **Vercel Dashboard** → プロジェクト選択
+2. **Settings** → **Environment Variables**
+3. 以下の変数を追加：
+
+```bash
+# Supabase設定
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-key-here
+
+# アプリ設定
+VITE_APP_NAME=Vibe Coding スターター
+```
+
+### 環境変数の設定手順
+
+```bash
+# 1. 本番用の値を準備
+# Supabase Dashboard > Settings > API から取得
+
+# 2. Vercelで設定
+Name: VITE_SUPABASE_URL
+Value: https://your-actual-project.supabase.co
+Environment: Production, Preview, Development
+
+Name: VITE_SUPABASE_ANON_KEY  
+Value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+Environment: Production, Preview, Development
+
+Name: VITE_APP_NAME
+Value: Vibe Coding スターター
+Environment: Production, Preview, Development
+```
+
+## 🔄 継続的デプロイの設定
+
+### GitHubとの連携
+
+Vercelプロジェクトは自動的にGitHubリポジトリと連携されます：
+
+- **mainブランチ** → 本番環境に自動デプロイ
+- **その他ブランチ** → プレビュー環境に自動デプロイ
+- **Pull Request** → プレビューURLが自動生成
+
+### 自動デプロイの確認
+
+```bash
+# 変更をプッシュして自動デプロイをテスト
+git add .
+git commit -m "test: verify auto deployment"
+git push origin main
+
+# Vercelが自動的にデプロイを開始
+```
+
+## 📊 デプロイ後の確認事項
+
+### 動作確認チェックリスト
+
+- [ ] サイトが正常に表示される
+- [ ] ログインフォームが表示される
+- [ ] Supabase接続エラーがない
+- [ ] 認証機能が動作する
+- [ ] Todo機能が正常に動作する
+- [ ] レスポンシブデザインが適切
+
+### トラブルシューティング
+
+#### 1. 環境変数エラー
+```bash
+# エラー例: "Environment variable not defined"
+# 解決策: Vercelダッシュボードで環境変数を再確認
+```
+
+#### 2. Supabase接続エラー
+```bash
+# エラー例: "Failed to fetch todos"
+# 解決策: 
+# 1. VITE_SUPABASE_URLが正しいか確認
+# 2. VITE_SUPABASE_ANON_KEYが正しいか確認
+# 3. Supabaseプロジェクトがアクティブか確認
+```
+
+#### 3. ビルドエラー
+```bash
+# エラー例: "Build failed"
+# 解決策:
+# 1. ローカルで npm run build を実行して確認
+# 2. TypeScriptエラーを修正
+# 3. 再デプロイ
+```
+
+## 🎯 Vercel設定ファイル（オプション）
+
+プロジェクトルートに `vercel.json` を作成してカスタム設定が可能：
+
+```json
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "installCommand": "npm install",
+  "devCommand": "npm run dev",
+  "framework": "vite",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
+```
+
+## 🌍 カスタムドメインの設定
+
+### 独自ドメインの追加
+
+1. **Vercel Dashboard** → **Domains**
+2. **Add Domain** をクリック
+3. ドメイン名を入力（例：`your-domain.com`）
+4. DNSレコードを設定：
+
+```bash
+# CNAMEレコード
+Type: CNAME
+Name: www
+Value: cname.vercel-dns.com
+
+# Aレコード（Apex domain）
+Type: A
+Name: @
+Value: 76.76.19.61
+```
+
+## 📈 パフォーマンス最適化
+
+### Vercel Analytics（オプション）
+
+```bash
+# Vercel Analyticsパッケージのインストール
+npm install @vercel/analytics
+
+# React統合
+import { Analytics } from '@vercel/analytics/react';
+
+export default function MyApp({ Component, pageProps }) {
+  return (
+    <>
+      <Component {...pageProps} />
+      <Analytics />
+    </>
+  );
+}
+```
+
+### 最適化のベストプラクティス
+
+1. **画像最適化**: Vercel Image Optimization使用
+2. **キャッシュ設定**: 静的アセットの適切なキャッシュ
+3. **バンドルサイズ**: Viteの自動最適化を活用
+
+## 🔐 セキュリティ設定
+
+### 環境変数の保護
+
+- ✅ `VITE_`プレフィックスでクライアント公開変数
+- ❌ シークレットキーは`VITE_`を使わない
+- ✅ 本番・プレビュー・開発環境別設定
+
+### セキュリティヘッダー
+
+`vercel.json`でセキュリティヘッダーを設定：
+
+```json
+{
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        }
+      ]
+    }
+  ]
+}
+```
+
+## 📚 メンテナンスとモニタリング
+
+### 定期的な確認事項
+
+- [ ] デプロイ状況の確認
+- [ ] エラーログの監視
+- [ ] パフォーマンスメトリクスの確認
+- [ ] セキュリティアップデートの適用
+
+### 有用なVercelコマンド
+
+```bash
+# プロジェクト情報確認
+vercel ls
+
+# ログ確認
+vercel logs
+
+# 環境変数確認
+vercel env ls
+
+# ドメイン確認
+vercel domains ls
+
+# プロジェクト削除（注意）
+vercel remove project-name
+```
+
+## 🆘 サポートとリソース
+
+### 公式ドキュメント
+
+- [Vercel Documentation](https://vercel.com/docs)
+- [Vite Deployment Guide](https://vitejs.dev/guide/static-deploy.html#vercel)
+- [Supabase Documentation](https://supabase.com/docs)
+
+### よくある質問
+
+**Q: デプロイが失敗する**
+A: ローカルで`npm run build`を実行してエラーを確認
+
+**Q: 環境変数が反映されない**
+A: Vercelダッシュボードで設定後、再デプロイが必要
+
+**Q: カスタムドメインが設定できない**
+A: DNSの伝播には最大48時間かかる場合があります
+
+## 💡 開発効率化のコツ
+
+1. **プレビューデプロイ活用**: PR作成で自動プレビュー
+2. **ローカル開発**: `vercel dev`でローカル環境をVercel環境に近づける
+3. **段階的デプロイ**: 重要な変更は段階的にリリース
+
+---
+
+このガイドに従えば、Vibe Coding Starterプロジェクトを確実にVercelでホスティングできます。問題が発生した場合は、トラブルシューティングセクションを参照してください。
