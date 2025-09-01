@@ -1,0 +1,167 @@
+---
+description: "Vibe Coding Starter 初期セットアップガイド（つまずき防止）"
+globs: .env*,README.md,package.json
+alwaysApply: false
+---
+
+# 🚀 Vibe Coding Starter セットアップガイド
+
+このガイドは初心者がつまずかないように、段階的なセットアップ手順を提供します。
+
+## 📋 前提条件
+
+- Node.js 18.0+ がインストール済み
+- npm または yarn がインストール済み
+- Git がインストール済み
+
+## 🛠️ ステップ1: 依存関係のインストール
+
+```bash
+npm install
+```
+
+## 🔐 ステップ2: 環境変数の設定
+
+### 2.1 環境変数ファイルをコピー
+```bash
+cp .env.example .env.local
+```
+
+### 2.2 Supabase プロジェクトの作成
+1. https://supabase.com/ にアクセス
+2. 「Start your project」をクリック
+3. 新しいプロジェクトを作成
+
+### 2.3 環境変数を実際の値に置換
+`.env.local` ファイルを編集：
+
+```bash
+# Supabase Dashboard > Settings > API から取得
+VITE_SUPABASE_URL=https://your-actual-project-ref.supabase.co
+VITE_SUPABASE_ANON_KEY=your-actual-anon-key-here
+VITE_APP_NAME=Vibe Coding スターター
+```
+
+**重要**: `.env.local` は絶対にGitにコミットしないでください！
+
+## 🗄️ ステップ3: データベースのセットアップ
+
+### 3.1 Supabase CLI のインストール（macOS）
+```bash
+brew install supabase/tap/supabase
+```
+
+### 3.2 Supabase にログイン
+```bash
+supabase login
+```
+
+### 3.3 プロジェクトをリンク
+```bash
+supabase link --project-ref your-project-ref
+```
+
+### 3.4 マイグレーションの実行
+```bash
+supabase db push
+```
+
+### 3.5 型ファイルの生成
+```bash
+npm run db:types
+```
+
+## 🔧 ステップ4: 認証設定（重要！）
+
+Supabaseでメール確認を無効化：
+
+1. **Supabase Dashboard** にアクセス
+2. **Authentication > Settings** に移動
+3. **Email Auth** セクションで：
+   - "Enable email confirmations" を **OFF** にする
+4. **Save Changes** をクリック
+
+### または、テストアカウントを作成：
+
+1. **Authentication > Users** に移動
+2. **"Add user"** をクリック
+3. **テストアカウント作成**：
+   ```
+   Email: test@example.com
+   Password: password123
+   Email Confirm: ✅ チェック
+   ```
+
+## 🚀 ステップ5: 開発サーバーの起動
+
+```bash
+npm run dev
+```
+
+ブラウザで http://localhost:5173/ にアクセス
+
+## ✅ 動作確認チェックリスト
+
+- [ ] ログインフォームが表示される
+- [ ] テストアカウントでログインできる
+- [ ] Todoの追加ができる
+- [ ] Todoの完了切り替えができる
+- [ ] Todoの削除ができる
+- [ ] ページリロード後もログイン状態が維持される
+
+## 🚨 よくある問題と解決策
+
+### 問題1: "Email not confirmed" エラー
+**解決策**: ステップ4の認証設定を実行
+
+### 問題2: "Cannot find module @/shared/lib/supabase"
+**解決策**: 開発サーバーを再起動
+```bash
+npm run dev
+```
+
+### 問題3: "Failed to fetch todos"
+**解決策**: 
+1. `.env.local` の値を再確認
+2. Supabaseプロジェクトがアクティブか確認
+3. データベースマイグレーションが完了しているか確認
+
+### 問題4: TypeScript型エラー
+**解決策**: 型ファイルを再生成
+```bash
+npm run db:types
+```
+
+### 問題5: コミット時にlint-stagedエラー
+**解決策**: エラーを修正してから再コミット（`--no-verify` は使用禁止）
+```bash
+npm run lint:fix
+npm run typecheck
+```
+
+## 📚 次のステップ
+
+セットアップ完了後：
+
+1. **Feature追加の練習**: todo機能を参考に新機能を実装
+2. **UI改善**: shared/ui コンポーネントをカスタマイズ
+3. **データベース拡張**: 新しいテーブルを追加
+4. **デプロイ**: Vercel や Netlify でホスティング
+
+## 💡 開発のコツ
+
+- **AI活用**: 「todoと同じパターンで〇〇機能を追加」のように具体的に指示
+- **型安全性**: any型は絶対に使わない
+- **Feature-first**: 新機能は必ず `src/features/` 配下に作成
+- **コミット前チェック**: lint-staged のエラーは必ず修正
+
+## 🆘 サポート
+
+問題が発生した場合：
+
+1. ブラウザのDeveloper Consoleでエラーを確認
+2. ターミナルのエラーメッセージを確認
+3. この手順書を最初から再実行
+4. Supabase Dashboard でプロジェクト状態を確認
+
+**すべてのステップを順番に実行すれば、必ず動作します！** 🎉

@@ -12,7 +12,10 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "prepare": "husky",
-    "pre-commit": "lint-staged"
+    "pre-commit": "lint-staged",
+    "db:link": "supabase link",
+    "db:types": "supabase gen types typescript --linked > src/shared/types/supabase.ts || echo 'Manual type management required - edit src/shared/types/supabase.ts'",
+    "db:status": "supabase projects list"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.3.4",

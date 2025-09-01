@@ -1,0 +1,287 @@
+---
+description: "Supabase本番環境との直接接続管理ルール"
+globs: .env*,src/shared/lib/env.ts,src/shared/types/supabase.ts,README.md
+alwaysApply: false
+---
+
+# Supabase本番環境との直接接続管理ルール
+
+## 基本原則
+
+**重要**: Vibe Coding Starterでは、**本番Supabaseプロジェクトとの直接接続**で、初心者が実際のクラウド環境で安全に学習できる環境を提供する。Docker不要で即座に開始可能。
+
+## 環境構成（本番接続）
+
+```
+.env.local              # 本番Supabaseプロジェクト接続情報
+.env                    # サンプル・テンプレート
+src/shared/lib/env.ts   # 環境変数バリデーション
+src/shared/types/supabase.ts  # 型定義（自動生成または手動作成）
+```
+
+## Vibe Coding Starter 固有設定
+
+### 環境変数設定（本番接続）
+```env
+# .env.local
+VITE_SUPABASE_URL=https://your-project-id.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-key-here
+VITE_APP_NAME=Vibe Coding スターター
+
+# Supabase CLI用（パスワード入力を回避）
+SUPABASE_DB_PASSWORD=your-database-password
+```
+
+### Supabaseプロジェクト設定（学習用）
+**Supabaseダッシュボード** → **Authentication** → **Settings**:
+- **Enable email confirmations**: OFF（学習用に簡素化）
+- **Enable phone confirmations**: OFF
+- **Minimum password length**: 6
+- **Site URL**: `http://localhost:5173`
+
+## 開発ワークフロー（環境変数重視）
+
+### 1. 日常の開発ワークフロー（パスワード不要）
+```bash
+# 1. 環境変数を設定（.env.local）
+# VITE_SUPABASE_URL と VITE_SUPABASE_ANON_KEY
+
+# 2. 開発サーバー起動（即座に開始）
+npm run dev
+
+# 3. ブラウザでアクセス
+# - アプリ: http://localhost:5173
+# - Supabaseダッシュボード: https://supabase.com/dashboard
+
+# 4. コード編集・デバッグ
+# 全てのSupabase操作は環境変数経由で動作
+```
+
+### 2. データベース変更時のみ（時々）
+
+#### Supabaseダッシュボードで変更（推奨）
+```bash
+# 1. https://supabase.com/dashboard でSQL Editorを使用
+# 2. テーブル作成・変更を実行
+# 3. 手動でsrc/shared/types/supabase.tsを更新
+# 4. npm run dev（環境変数のみ、パスワード不要）
+```
+
+#### CLIで変更（上級者向け）
+```bash
+# データベースパスワードが必要
+supabase db push     # マイグレーション適用
+npm run db:types     # 型定義自動生成
+```
+
+#### マイグレーション例（todos テーブル）
+```sql
+-- supabase/migrations/YYYYMMDDHHMMSS_create_todos_table.sql
+
+-- Create todos table
+CREATE TABLE IF NOT EXISTS todos (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    title TEXT NOT NULL,
+    completed BOOLEAN DEFAULT FALSE,
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW())
+);
+
+-- Enable RLS
+ALTER TABLE todos ENABLE ROW LEVEL SECURITY;
+
+-- Create policies
+CREATE POLICY "Users can only see their own todos" ON todos
+    FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert their own todos" ON todos
+    FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update their own todos" ON todos  
+    FOR UPDATE USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete their own todos" ON todos
+    FOR DELETE USING (auth.uid() = user_id);
+
+-- Create indexes for performance
+CREATE INDEX IF NOT EXISTS todos_user_id_idx ON todos(user_id);
+CREATE INDEX IF NOT EXISTS todos_created_at_idx ON todos(created_at DESC);
+```
+
+### 3. 型安全性の確保
+
+#### 型生成の管理
+```bash
+# package.jsonスクリプト（本番接続用）
+"scripts": {
+  "db:types": "supabase gen types typescript --linked > src/shared/types/supabase.ts",
+  "db:link": "supabase link --project-ref YOUR_PROJECT_REF"
+}
+
+# または手動で型定義を管理
+# src/shared/types/supabase.ts を直接編集
+```
+
+#### TypeScript統合
+```typescript
+// src/shared/types/supabase.ts (自動生成)
+export interface Database {
+  public: {
+    Tables: {
+      todos: {
+        Row: {
+          id: string
+          title: string
+          completed: boolean
+          user_id: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          title: string
+          completed?: boolean
+          user_id: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          // ...
+        }
+      }
+    }
+  }
+}
+```
+
+## セキュリティとベストプラクティス
+
+### Row Level Security (RLS) の必須適用
+```sql
+-- ❌ 禁止: RLSなしのテーブル
+CREATE TABLE todos (...);
+
+-- ✅ 必須: RLS有効化
+CREATE TABLE todos (...);
+ALTER TABLE todos ENABLE ROW LEVEL SECURITY;
+
+-- ✅ 必須: 適切なポリシー
+CREATE POLICY "Users can only access their own data" ON todos
+    FOR ALL USING (auth.uid() = user_id);
+```
+
+### 初心者向けの安全な設定
+```toml
+# config.toml での推奨設定
+
+[db]
+# メジャーバージョンは本番環境と合わせる
+major_version = 17
+
+[auth]
+# 学習用設定
+enable_signup = true
+enable_confirmations = false
+minimum_password_length = 6
+
+# セキュリティ設定（本番では強化）
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+```
+
+## 本番環境へのデプロイ
+
+### リモートとの同期
+```bash
+# 1. リモートプロジェクトとリンク
+supabase link --project-ref YOUR_PROJECT_REF
+
+# 2. ローカルマイグレーションを本番に適用
+supabase db push
+
+# 3. 本番の型定義を取得
+supabase gen types typescript --linked > src/shared/types/supabase.ts
+```
+
+### 環境別管理
+```bash
+# 開発環境（ローカル）
+supabase start
+npm run dev
+
+# ステージング環境
+supabase link --project-ref STAGING_REF
+supabase db push
+
+# 本番環境  
+supabase link --project-ref PRODUCTION_REF
+supabase db push
+```
+
+## よくあるエラーと対処法
+
+### 1. Docker関連エラー
+```bash
+# Docker Desktopが起動していない
+Error: Cannot connect to the Docker daemon
+
+# 対処:
+1. Docker Desktopを起動
+2. supabase start を再実行
+```
+
+### 2. ポート競合エラー
+```bash
+# ポートが使用中
+Error: port 54321 is already in use
+
+# 対処:
+1. config.tomlでポート変更
+2. または使用中のプロセスを停止
+```
+
+### 3. 認証エラー
+```bash
+# JWTトークンエラー
+Invalid JWT token
+
+# 対処:
+1. .env.localのキーを確認
+2. supabase restartを実行
+```
+
+## パフォーマンス最適化
+
+### インデックス戦略
+```sql
+-- 必須インデックス
+CREATE INDEX todos_user_id_idx ON todos(user_id);
+CREATE INDEX todos_created_at_idx ON todos(created_at DESC);
+
+-- 複合インデックス（必要に応じて）
+CREATE INDEX todos_user_completed_idx ON todos(user_id, completed);
+```
+
+### クエリ最適化
+```typescript
+// ❌ 非効率: 全件取得後フィルタ
+const { data } = await supabase.from('todos').select('*');
+const userTodos = data.filter(t => t.user_id === userId);
+
+// ✅ 効率的: DB側でフィルタ
+const { data } = await supabase
+  .from('todos')
+  .select('*')
+  .eq('user_id', userId)
+  .order('created_at', { ascending: false });
+```
+
+## メモリ項目
+
+AIアシスタントは以下を記憶すること：
+- ローカル優先開発でマイグレーション管理
+- 全テーブルでRLS必須適用
+- 型定義は自動生成を活用
+- Vite開発サーバー（5173）との連携
+- 初心者の学習体験を最優先に考慮

@@ -1,0 +1,209 @@
+---
+description: "環境変数とプロジェクト設定管理ルール"
+globs: .env*,src/shared/lib/env.ts,vite-env.d.ts,README.md
+alwaysApply: false
+---
+
+# 環境変数とプロジェクト設定管理ルール
+
+## 基本原則
+
+**重要**: 環境変数は絶対にハードコーディングせず、適切な管理を行う。
+
+## ファイル構成
+
+### 環境変数ファイルの役割
+```
+.env                 # サンプル・テンプレート（Gitにコミット）
+.env.local          # 実際の設定値（Gitに含めない）
+.env.example        # 公開用のサンプル（Gitにコミット）
+.env.production     # 本番環境用（Gitに含めない）
+```
+
+### 📁 ファイル管理ルール
+
+#### ✅ Gitにコミットして良いもの
+- `.env` (サンプル値のみ)
+- `.env.example` (サンプル値のみ)
+- `src/shared/lib/env.ts` (バリデーション)
+- `vite-env.d.ts` (型定義)
+
+#### ❌ Gitにコミットしてはいけないもの
+- `.env.local` (実際の値)
+- `.env.production` (本番環境の値)
+- `.env.development` (開発環境の個人設定)
+
+## 環境変数の追加プロセス
+
+### 1. 新しい環境変数を追加する場合
+
+1. **型定義を追加** (`vite-env.d.ts`)
+   ```typescript
+   interface ImportMetaEnv {
+     readonly VITE_SUPABASE_URL: string
+     readonly VITE_SUPABASE_ANON_KEY: string
+     readonly VITE_APP_NAME?: string
+     readonly VITE_NEW_VARIABLE: string  // ← 新しい変数
+   }
+   ```
+
+2. **Zodスキーマに追加** (`src/shared/lib/env.ts`)
+   ```typescript
+   const envSchema = z.object({
+     VITE_SUPABASE_URL: z.string().url(),
+     VITE_SUPABASE_ANON_KEY: z.string().min(1),
+     VITE_APP_NAME: z.string().optional(),
+     VITE_NEW_VARIABLE: z.string().min(1),  // ← 新しい変数
+   });
+   ```
+
+3. **サンプルファイルに追加** (`.env`)
+   ```env
+   VITE_NEW_VARIABLE=sample-value-here
+   ```
+
+4. **実際の値を設定** (`.env.local`)
+   ```env
+   VITE_NEW_VARIABLE=actual-production-value
+   ```
+
+### 2. 環境変数の命名規則
+
+#### Viteプロジェクト
+- **必須**: `VITE_` プレフィックス
+- **形式**: `VITE_CATEGORY_NAME`
+- **例**: `VITE_SUPABASE_URL`, `VITE_API_BASE_URL`
+
+#### カテゴリ別命名
+```env
+# Supabase関連
+VITE_SUPABASE_URL=
+VITE_SUPABASE_ANON_KEY=
+
+# API関連
+VITE_API_BASE_URL=
+VITE_API_TIMEOUT=
+
+# アプリ設定
+VITE_APP_NAME=
+VITE_APP_VERSION=
+
+# 機能フラグ
+VITE_FEATURE_FLAG_NEW_UI=
+VITE_FEATURE_FLAG_ANALYTICS=
+```
+
+## セキュリティルール
+
+### ❌ 絶対禁止事項
+```typescript
+// ❌ ハードコーディング
+const apiUrl = 'https://api.example.com';
+
+// ❌ 直接import.meta.env使用
+const url = import.meta.env.VITE_SUPABASE_URL;
+
+// ❌ シークレットキーをVITE_で公開
+VITE_SECRET_KEY=secret123  // クライアントサイドで見える
+```
+
+### ✅ 正しい使用方法
+```typescript
+// ✅ env.tsを経由
+import { env } from '@/shared/lib/env';
+const apiUrl = env.VITE_SUPABASE_URL;
+
+// ✅ バリデーション済み
+export const config = {
+  supabase: {
+    url: env.VITE_SUPABASE_URL,
+    anonKey: env.VITE_SUPABASE_ANON_KEY,
+  },
+};
+```
+
+## 開発ワークフロー
+
+### 初回セットアップ（重要！）
+```bash
+# 1. テンプレートから実際の設定ファイルを作成
+cp .env.example .env.local
+
+# 2. Supabase Dashboard > Settings > API から値を取得
+# 3. .env.localに実際の値を入力
+# VITE_SUPABASE_URL=https://your-project.supabase.co
+# VITE_SUPABASE_ANON_KEY=your-actual-anon-key
+
+# 4. アプリケーション再起動
+npm run dev
+```
+
+**注意**: `.env.local`は絶対にGitにコミットしないこと！
+
+### 新メンバーのオンボーディング
+```bash
+# 1. リポジトリクローン
+git clone <repository>
+
+# 2. 依存関係インストール
+npm install
+
+# 3. 環境変数設定
+cp .env .env.local
+# .env.localを編集してプロジェクト固有の値を設定
+
+# 4. 開発サーバー起動
+npm run dev
+```
+
+### 環境変数変更時のチェックリスト
+- [ ] 型定義更新 (`vite-env.d.ts`)
+- [ ] バリデーション更新 (`env.ts`)
+- [ ] サンプル更新 (`.env`)
+- [ ] ドキュメント更新 (`README.md`)
+- [ ] チームメンバーに通知
+
+## エラー対応
+
+### よくあるエラーと対処法
+
+#### 1. `Environment variable not defined`
+```bash
+# 原因: .env.localが存在しない
+# 対処: 
+cp .env .env.local
+# .env.localを編集
+```
+
+#### 2. `Invalid URL format`
+```bash
+# 原因: VITE_SUPABASE_URLの形式が間違っている
+# 対処: https://から始まる正しいURLを設定
+```
+
+#### 3. `Authentication failed`
+```bash
+# 原因: VITE_SUPABASE_ANON_KEYが間違っている
+# 対処: Supabaseダッシュボードから正しいキーをコピー
+```
+
+## 本番環境での管理
+
+### Vercel での設定
+1. ダッシュボード → Settings → Environment Variables
+2. 各変数を個別に設定
+3. Production / Preview / Development 環境を適切に設定
+
+### Netlify での設定
+1. Site settings → Environment variables
+2. Key/Value形式で設定
+3. ビルドコマンドで適切な環境変数を参照
+
+## メモリ項目
+
+AIアシスタントは以下を記憶すること：
+- 環境変数は必ずenv.ts経由でアクセス
+- 新しい環境変数追加時は型定義も更新
+- シークレット情報は絶対にVITE_プレフィックスを使わない
+- .env.localは実際の値、.envはサンプル値
+- セキュリティを最優先に考慮
