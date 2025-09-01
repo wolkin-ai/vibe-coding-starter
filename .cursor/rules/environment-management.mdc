@@ -1,9 +1,7 @@
 ---
 description: "環境変数とプロジェクト設定管理ルール"
-globs: .env*,src/shared/lib/env.ts,vite-env.d.ts,README.md
 alwaysApply: false
 ---
-
 # 環境変数とプロジェクト設定管理ルール
 
 ## 基本原則
