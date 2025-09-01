@@ -1,7 +1,9 @@
 import React from 'react';
-import { CheckCircle2 } from 'lucide-react';
+import { CheckCircle2, Trash2 } from 'lucide-react';
 
-import { useTodos } from '../hooks';
+import { Button } from '@/shared/ui';
+
+import { useTodos, useDeleteCompletedTodos } from '../hooks';
 import { TodoItem } from './TodoItem';
 
 /**
@@ -11,6 +13,9 @@ import { TodoItem } from './TodoItem';
  */
 export function TodoList() {
   const { data: todos, isLoading, error } = useTodos();
+  const deleteCompleted = useDeleteCompletedTodos();
+
+  const completedCount = todos?.filter((todo) => todo.completed).length ?? 0;
 
   if (isLoading) {
     return (
@@ -53,8 +58,25 @@ export function TodoList() {
         <TodoItem key={todo.id} todo={todo} />
       ))}
 
-      <div className="mt-6 text-center">
+      <div className="mt-6 space-y-3 text-center">
         <p className="text-sm text-gray-500">合計 {todos.length} 件のTodo</p>
+
+        {completedCount > 0 && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              if (window.confirm(`${completedCount}件の完了済みTodoを削除してもよろしいですか？`)) {
+                deleteCompleted.mutate();
+              }
+            }}
+            disabled={deleteCompleted.isPending}
+            className="flex items-center gap-2 text-red-600 hover:text-red-700"
+          >
+            <Trash2 className="h-4 w-4" />
+            {deleteCompleted.isPending ? '削除中...' : `完了済みTodoを削除 (${completedCount}件)`}
+          </Button>
+        )}
       </div>
     </div>
   );

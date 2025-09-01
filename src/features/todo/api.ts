@@ -106,3 +106,27 @@ export async function deleteTodo(id: string): Promise<void> {
     throw new Error(`Failed to delete todo: ${error.message}`);
   }
 }
+
+/**
+ * Delete all completed todos for the current user
+ */
+export async function deleteCompletedTodos(): Promise<number> {
+  const { data: user } = await supabase.auth.getUser();
+
+  if (!user.user) {
+    throw new Error('User not authenticated');
+  }
+
+  const { data, error } = await supabase
+    .from('todos')
+    .delete()
+    .eq('user_id', user.user.id)
+    .eq('completed', true)
+    .select('id'); // Return deleted IDs to count them
+
+  if (error) {
+    throw new Error(`Failed to delete completed todos: ${error.message}`);
+  }
+
+  return data?.length ?? 0;
+}

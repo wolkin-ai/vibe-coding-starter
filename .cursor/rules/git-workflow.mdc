@@ -1,9 +1,6 @@
 ---
-description: "Git ワークフローとコミット規約"
-globs: .gitignore,.husky/*,package.json,README.md,CONTRIBUTING.md
-alwaysApply: false
+alwaysApply: true
 ---
-
 # Git ワークフローとコミット規約
 
 ## 基本原則

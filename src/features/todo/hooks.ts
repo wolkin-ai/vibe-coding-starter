@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { ui } from '@/shared/config';
 
-import { addTodo, deleteTodo, listTodos, updateTodo } from './api';
+import { addTodo, deleteTodo, deleteCompletedTodos, listTodos, updateTodo } from './api';
 
 import type { TodoInput, TodoUpdate } from './schema';
 
@@ -97,6 +97,27 @@ export function useToggleTodo() {
     onSettled: () => {
       // Always refetch after error or success
       queryClient.invalidateQueries({ queryKey: TODO_QUERY_KEY });
+    },
+  });
+}
+
+/**
+ * Hook for deleting all completed todos
+ */
+export function useDeleteCompletedTodos() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: deleteCompletedTodos,
+    onSuccess: (deletedCount) => {
+      // Invalidate and refetch todos
+      queryClient.invalidateQueries({ queryKey: TODO_QUERY_KEY });
+
+      // Show success message (if you have a toast system)
+      console.log(`削除完了: ${deletedCount}件の完了済みTodoを削除しました`);
+    },
+    onError: (error) => {
+      console.error('一括削除に失敗しました:', error);
     },
   });
 }
