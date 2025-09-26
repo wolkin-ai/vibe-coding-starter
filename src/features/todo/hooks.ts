@@ -1,3 +1,4 @@
+import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { ui } from '@/shared/config';
@@ -5,6 +6,7 @@ import { ui } from '@/shared/config';
 import { addTodo, deleteTodo, deleteCompletedTodos, listTodos, updateTodo } from './api';
 
 import type { TodoInput, TodoUpdate } from './schema';
+import type { Todo, TodoFilter, TodoStatistics } from './types';
 
 /**
  * Todo React Query hooks
@@ -120,4 +122,47 @@ export function useDeleteCompletedTodos() {
       console.error('一括削除に失敗しました:', error);
     },
   });
+}
+
+/**
+ * Manage todo filtering state and derived statistics
+ */
+export function useTodoFilters(todos?: Todo[]) {
+  const [filter, setFilter] = useState<TodoFilter>('all');
+
+  const statistics = useMemo<TodoStatistics>(() => {
+    const source = todos ?? [];
+    const totalCount = source.length;
+    const completedCount = source.filter((todo) => todo.completed).length;
+    const activeCount = totalCount - completedCount;
+    const completionRate = totalCount === 0 ? 0 : Math.round((completedCount / totalCount) * 100);
+
+    return {
+      totalCount,
+      completedCount,
+      activeCount,
+      completionRate,
+    };
+  }, [todos]);
+
+  const filteredTodos = useMemo(() => {
+    const source = todos ?? [];
+
+    switch (filter) {
+      case 'active':
+        return source.filter((todo) => !todo.completed);
+      case 'completed':
+        return source.filter((todo) => todo.completed);
+      default:
+        return source;
+    }
+  }, [todos, filter]);
+
+  return {
+    filter,
+    setFilter,
+    filteredTodos,
+    statistics,
+    filteredCount: filteredTodos.length,
+  };
 }

@@ -25,3 +25,12 @@ export interface TodoFormState {
   isSubmitting: boolean;
   error: string | null;
 }
+
+export type TodoFilter = 'all' | 'active' | 'completed';
+
+export interface TodoStatistics {
+  totalCount: number;
+  completedCount: number;
+  activeCount: number;
+  completionRate: number;
+}
