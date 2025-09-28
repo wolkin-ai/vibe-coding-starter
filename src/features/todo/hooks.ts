@@ -129,6 +129,7 @@ export function useDeleteCompletedTodos() {
  */
 export function useTodoFilters(todos?: Todo[]) {
   const [filter, setFilter] = useState<TodoFilter>('all');
+  const [searchTerm, setSearchTerm] = useState('');
 
   const statistics = useMemo<TodoStatistics>(() => {
     const source = todos ?? [];
@@ -147,20 +148,39 @@ export function useTodoFilters(todos?: Todo[]) {
 
   const filteredTodos = useMemo(() => {
     const source = todos ?? [];
+    const normalizedQuery = searchTerm.trim().toLowerCase();
 
-    switch (filter) {
-      case 'active':
-        return source.filter((todo) => !todo.completed);
-      case 'completed':
-        return source.filter((todo) => todo.completed);
-      default:
-        return source;
+    const filteredByStatus = (() => {
+      switch (filter) {
+        case 'active':
+          return source.filter((todo) => !todo.completed);
+        case 'completed':
+          return source.filter((todo) => todo.completed);
+        default:
+          return source;
+      }
+    })();
+
+    if (!normalizedQuery) {
+      return filteredByStatus;
     }
-  }, [todos, filter]);
+
+    return filteredByStatus.filter((todo) => {
+      const title = todo.title?.toLowerCase() ?? '';
+      const description =
+        'description' in todo && typeof todo.description === 'string'
+          ? todo.description.toLowerCase()
+          : '';
+
+      return title.includes(normalizedQuery) || description.includes(normalizedQuery);
+    });
+  }, [todos, filter, searchTerm]);
 
   return {
     filter,
     setFilter,
+    searchTerm,
+    setSearchTerm,
     filteredTodos,
     statistics,
     filteredCount: filteredTodos.length,
