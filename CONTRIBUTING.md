@@ -1,60 +1,60 @@
-# 🤝 Contributing to Vibe Coding Starter
+# 🤝 Vibe Coding Starter への貢献
 
-This guide helps both **human developers** and **AI assistants** contribute to this project effectively.
+このガイドは、**人間の開発者**と**AIアシスタント**の両方がこのプロジェクトに効果的に貢献するためのものです。
 
-## 🎯 Core Principles
+## 🎯 基本原則
 
-1. **Feature-first organization** - Group by features, not file types
-2. **Type safety** - TypeScript strict mode, no `any` allowed
-3. **Consistency** - Follow established patterns
-4. **Simplicity** - Prefer simple, readable solutions
-5. **AI-friendly** - Clear structure that AI can understand and extend
+1. **Feature-first組織** - ファイルタイプではなく機能でグループ化
+2. **型安全性** - TypeScript strict mode、`any`は禁止
+3. **一貫性** - 確立されたパターンに従う
+4. **シンプルさ** - シンプルで読みやすいソリューションを優先
+5. **AI対応** - AIが理解・拡張できる明確な構造
 
-## 📁 Project Structure Rules
+## 📁 プロジェクト構造ルール
 
-### Directory Organization
+### ディレクトリ構成
 
 ```
 src/
-  app/                 # ✅ Pages and routing only
-  features/            # ✅ Feature-specific code (main workspace)
+  app/                 # ✅ ページとルーティングのみ
+  features/            # ✅ 機能固有のコード（メインワークスペース）
     <feature-name>/
-      components/      # UI components for this feature
-      api.ts          # Database/API calls (Supabase)
-      hooks.ts        # React Query hooks
-      schema.ts       # Validation schemas (zod)
-      types.ts        # TypeScript type definitions
-      index.ts        # Feature exports
-  shared/             # ✅ Shared utilities and components
-    ui/               # Reusable UI components
-    lib/              # Utilities and configuration
-    config.ts         # Global constants (NO hardcoding elsewhere)
-    types/            # Shared type definitions
+      components/      # この機能のUIコンポーネント
+      api.ts          # データベース/API呼び出し（Supabase）
+      hooks.ts        # React Queryフック
+      schema.ts       # バリデーションスキーマ（zod）
+      types.ts        # TypeScript型定義
+      index.ts        # 機能のエクスポート
+  shared/             # ✅ 共有ユーティリティとコンポーネント
+    ui/               # 再利用可能なUIコンポーネント
+    lib/              # ユーティリティと設定
+    config.ts         # グローバル定数（他の場所でハードコーディング禁止）
+    types/            # 共有型定義
 ```
 
-### ✅ What Goes Where
+### ✅ 何をどこに置くか
 
-| File Type     | Location                | Purpose                                     |
-| ------------- | ----------------------- | ------------------------------------------- |
-| Pages         | `src/app/`              | Route components, layout, navigation        |
-| Feature logic | `src/features/*/`       | Business logic, feature-specific components |
-| Reusable UI   | `src/shared/ui/`        | Button, Input, Card, etc.                   |
-| Configuration | `src/shared/lib/env.ts` | Environment variables (zod-validated)       |
-| Constants     | `src/shared/config.ts`  | Global constants and settings               |
-| Types         | `src/shared/types/`     | Shared type definitions                     |
+| ファイルタイプ | 場所                    | 目的                                             |
+| -------------- | ----------------------- | ------------------------------------------------ |
+| ページ         | `src/app/`              | ルートコンポーネント、レイアウト、ナビゲーション |
+| 機能ロジック   | `src/features/*/`       | ビジネスロジック、機能固有のコンポーネント       |
+| 再利用可能UI   | `src/shared/ui/`        | Button、Input、Cardなど                          |
+| 設定           | `src/shared/lib/env.ts` | 環境変数（zod検証済み）                          |
+| 定数           | `src/shared/config.ts`  | グローバル定数と設定                             |
+| 型             | `src/shared/types/`     | 共有型定義                                       |
 
-## 🔒 Strict Rules (Never Break These)
+## 🔒 厳格なルール（絶対に破ってはいけない）
 
-### 1. No Hardcoding
+### 1. ハードコーディング禁止
 
-❌ **Wrong:**
+❌ **間違い:**
 
 ```typescript
 const apiUrl = 'https://api.example.com';
 const pageSize = 20;
 ```
 
-✅ **Correct:**
+✅ **正しい:**
 
 ```typescript
 import { env } from '@/shared/lib/env';
@@ -64,9 +64,9 @@ const apiUrl = env.VITE_API_URL;
 const pageSize = ui.defaultPageSize;
 ```
 
-### 2. No `any` Type
+### 2. `any`型の禁止
 
-❌ **Wrong:**
+❌ **間違い:**
 
 ```typescript
 function handleData(data: any) {
@@ -74,7 +74,7 @@ function handleData(data: any) {
 }
 ```
 
-✅ **Correct:**
+✅ **正しい:**
 
 ```typescript
 import { z } from 'zod';
@@ -89,41 +89,41 @@ function handleData(data: unknown) {
 }
 ```
 
-### 3. Database Access Through `api.ts`
+### 3. データベースアクセスは`api.ts`経由
 
-❌ **Wrong (in a component):**
+❌ **間違い（コンポーネント内で）:**
 
 ```typescript
 const { data } = await supabase.from('todos').select('*');
 ```
 
-✅ **Correct:**
+✅ **正しい:**
 
 ```typescript
-// In features/todo/api.ts
+// features/todo/api.ts 内
 export async function listTodos() {
   const { data, error } = await supabase.from('todos').select('*');
   if (error) throw error;
   return data;
 }
 
-// In component
+// コンポーネント内
 import { useTodos } from './hooks';
 const { data } = useTodos();
 ```
 
-### 4. Validation with Zod
+### 4. Zodによるバリデーション
 
-❌ **Wrong:**
+❌ **間違い:**
 
 ```typescript
 function createTodo(title: string) {
-  // Hope title is valid...
+  // titleが有効であることを祈る...
   return api.create({ title });
 }
 ```
 
-✅ **Correct:**
+✅ **正しい:**
 
 ```typescript
 import { todoInputSchema } from './schema';
@@ -134,19 +134,19 @@ function createTodo(input: unknown) {
 }
 ```
 
-## 🎨 Coding Standards
+## 🎨 コーディング規約
 
-### TypeScript Configuration
+### TypeScript設定
 
-- Use **strict mode** - `"strict": true`
-- Enable additional strict checks:
+- **strict mode**を使用 - `"strict": true`
+- 追加の厳格チェックを有効化:
   - `"exactOptionalPropertyTypes": true`
   - `"noUncheckedIndexedAccess": true`
   - `"useUnknownInCatchVariables": true`
 
-### Import Organization
+### インポート組織
 
-Imports should be organized in this order (enforced by ESLint):
+インポートは以下の順序で整理する（ESLintで強制）:
 
 ```typescript
 // 1. Node modules
@@ -161,35 +161,35 @@ import { useTodos } from './hooks';
 import './styles.css';
 ```
 
-### Naming Conventions
+### 命名規約
 
-| Type                | Convention       | Example                    |
+| タイプ              | 規約             | 例                         |
 | ------------------- | ---------------- | -------------------------- |
-| Files               | kebab-case       | `todo-form.tsx`            |
-| Components          | PascalCase       | `TodoForm`                 |
-| Variables/Functions | camelCase        | `fetchTodos`, `isLoading`  |
-| Constants           | UPPER_SNAKE_CASE | `DEFAULT_PAGE_SIZE`        |
-| Types/Interfaces    | PascalCase       | `TodoInput`, `ApiResponse` |
+| ファイル            | kebab-case       | `todo-form.tsx`            |
+| コンポーネント      | PascalCase       | `TodoForm`                 |
+| 変数/関数           | camelCase        | `fetchTodos`, `isLoading`  |
+| 定数                | UPPER_SNAKE_CASE | `DEFAULT_PAGE_SIZE`        |
+| 型/インターフェース | PascalCase       | `TodoInput`, `ApiResponse` |
 
-## 🚀 Adding New Features
+## 🚀 新機能の追加
 
-### Step-by-Step Process
+### ステップバイステップのプロセス
 
-1. **Create feature directory:**
+1. **機能ディレクトリの作成:**
 
    ```bash
    mkdir src/features/my-feature
    cd src/features/my-feature
    ```
 
-2. **Create core files:**
+2. **コアファイルの作成:**
 
    ```bash
    touch api.ts hooks.ts schema.ts types.ts index.ts
    mkdir components
    ```
 
-3. **Define types first (`types.ts`):**
+3. **最初に型を定義（`types.ts`）:**
 
    ```typescript
    export interface MyFeatureItem {
@@ -199,7 +199,7 @@ import './styles.css';
    }
    ```
 
-4. **Create validation schemas (`schema.ts`):**
+4. **バリデーションスキーマの作成（`schema.ts`）:**
 
    ```typescript
    import { z } from 'zod';
@@ -211,7 +211,7 @@ import './styles.css';
    export type MyFeatureInput = z.infer<typeof myFeatureInputSchema>;
    ```
 
-5. **Implement API calls (`api.ts`):**
+5. **API呼び出しの実装（`api.ts`）:**
 
    ```typescript
    import { supabase } from '@/shared/lib/supabase';
@@ -224,7 +224,7 @@ import './styles.css';
    }
    ```
 
-6. **Create React Query hooks (`hooks.ts`):**
+6. **React Queryフックの作成（`hooks.ts`）:**
 
    ```typescript
    import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';

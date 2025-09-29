@@ -7,3 +7,5 @@
 export { TodoForm } from './TodoForm';
 export { TodoItem } from './TodoItem';
 export { TodoList } from './TodoList';
+export { TodoFilterBar } from './TodoFilterBar';
+export { TodoSummary } from './TodoSummary';

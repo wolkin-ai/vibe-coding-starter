@@ -1,9 +1,7 @@
 ---
 description: "Vibe Coding Starter 初期セットアップガイド（つまずき防止）"
-globs: .env*,README.md,package.json
 alwaysApply: false
 ---
-
 # 🚀 Vibe Coding Starter セットアップガイド
 
 このガイドは初心者がつまずかないように、段階的なセットアップ手順を提供します。
@@ -146,7 +144,31 @@ npm run typecheck
 1. **Feature追加の練習**: todo機能を参考に新機能を実装
 2. **UI改善**: shared/ui コンポーネントをカスタマイズ
 3. **データベース拡張**: 新しいテーブルを追加
-4. **デプロイ**: Vercel や Netlify でホスティング
+4. **デプロイ**: Vercelでホスティング（詳細は `.cursor/rules/deployment-guide.mdc` 参照）
+
+## 🌐 本番デプロイ（Vercel推奨）
+
+### クイックデプロイ
+```bash
+# Vercel CLIインストール
+npm install -g vercel@latest
+
+# ログイン
+vercel login
+
+# デプロイ
+vercel --prod
+```
+
+### 重要：環境変数設定
+デプロイ後、Vercelダッシュボードで以下を設定：
+```
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-key-here
+VITE_APP_NAME=Vibe Coding スターター
+```
+
+詳細な手順は **`.cursor/rules/deployment-guide.mdc`** を参照してください。
 
 ## 💡 開発のコツ
 

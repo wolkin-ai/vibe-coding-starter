@@ -3,8 +3,10 @@ import { CheckCircle2, Trash2 } from 'lucide-react';
 
 import { Button } from '@/shared/ui';
 
-import { useTodos, useDeleteCompletedTodos } from '../hooks';
+import { useTodos, useDeleteCompletedTodos, useTodoFilters } from '../hooks';
 import { TodoItem } from './TodoItem';
+import { TodoFilterBar } from './TodoFilterBar';
+import { TodoSummary } from './TodoSummary';
 
 /**
  * Todo list component
@@ -14,8 +16,9 @@ import { TodoItem } from './TodoItem';
 export function TodoList() {
   const { data: todos, isLoading, error } = useTodos();
   const deleteCompleted = useDeleteCompletedTodos();
-
-  const completedCount = todos?.filter((todo) => todo.completed).length ?? 0;
+  const { filter, setFilter, searchTerm, setSearchTerm, filteredTodos, filteredCount, statistics } =
+    useTodoFilters(todos);
+  const { totalCount, completedCount, activeCount, completionRate } = statistics;
 
   if (isLoading) {
     return (
@@ -53,13 +56,45 @@ export function TodoList() {
   }
 
   return (
-    <div className="space-y-3">
-      {todos.map((todo) => (
-        <TodoItem key={todo.id} todo={todo} />
-      ))}
+    <div className="space-y-4">
+      <TodoSummary
+        totalCount={totalCount}
+        completedCount={completedCount}
+        activeCount={activeCount}
+        completionRate={completionRate}
+      />
 
-      <div className="mt-6 space-y-3 text-center">
-        <p className="text-sm text-gray-500">合計 {todos.length} 件のTodo</p>
+      <TodoFilterBar
+        activeFilter={filter}
+        onFilterChange={(nextFilter) => setFilter(nextFilter)}
+        counts={{
+          total: totalCount,
+          active: activeCount,
+          completed: completedCount,
+        }}
+        searchTerm={searchTerm}
+        onSearchChange={setSearchTerm}
+      />
+
+      {filteredCount === 0 ? (
+        <div className="rounded-lg border border-gray-200 bg-gray-50 p-6 text-center">
+          <h3 className="text-sm font-medium text-gray-900">該当するTodoがありません</h3>
+          <p className="mt-1 text-xs text-gray-500">
+            {searchTerm
+              ? '検索キーワードを変えるか、条件に合うTodoを追加してください。'
+              : '別のフィルタを試すか、新しいTodoを追加してください。'}
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {filteredTodos.map((todo) => (
+            <TodoItem key={todo.id} todo={todo} />
+          ))}
+        </div>
+      )}
+
+      <div className="space-y-3 rounded-lg border border-gray-100 bg-gray-50 p-4 text-center">
+        <p className="text-sm text-gray-500">合計 {totalCount} 件のTodo</p>
 
         {completedCount > 0 && (
           <Button
