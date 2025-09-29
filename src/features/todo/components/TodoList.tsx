@@ -16,7 +16,8 @@ import { TodoSummary } from './TodoSummary';
 export function TodoList() {
   const { data: todos, isLoading, error } = useTodos();
   const deleteCompleted = useDeleteCompletedTodos();
-  const { filter, setFilter, filteredTodos, filteredCount, statistics } = useTodoFilters(todos);
+  const { filter, setFilter, searchTerm, setSearchTerm, filteredTodos, filteredCount, statistics } =
+    useTodoFilters(todos);
   const { totalCount, completedCount, activeCount, completionRate } = statistics;
 
   if (isLoading) {
@@ -71,13 +72,17 @@ export function TodoList() {
           active: activeCount,
           completed: completedCount,
         }}
+        searchTerm={searchTerm}
+        onSearchChange={setSearchTerm}
       />
 
       {filteredCount === 0 ? (
         <div className="rounded-lg border border-gray-200 bg-gray-50 p-6 text-center">
           <h3 className="text-sm font-medium text-gray-900">該当するTodoがありません</h3>
           <p className="mt-1 text-xs text-gray-500">
-            別のフィルタを試すか、新しいTodoを追加してください。
+            {searchTerm
+              ? '検索キーワードを変えるか、条件に合うTodoを追加してください。'
+              : '別のフィルタを試すか、新しいTodoを追加してください。'}
           </p>
         </div>
       ) : (
