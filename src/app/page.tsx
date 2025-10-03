@@ -92,10 +92,10 @@ export default function HomePage() {
 
           <div className="flex gap-3">
             <Button asChild>
-              <Link to="/todos">Todoアプリを試す</Link>
+              <Link to="/salon/projects">美容室アプリを試す</Link>
             </Button>
             <Button variant="outline" asChild>
-              <Link to="/auth/login">サインイン</Link>
+              <Link to="/todos">Todoアプリを試す</Link>
             </Button>
           </div>
         </CardContent>
