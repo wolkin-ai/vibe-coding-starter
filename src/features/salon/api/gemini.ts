@@ -73,13 +73,17 @@ export interface GenerationResult {
   variation_rank: number;
 }
 
+export type OnVariationGenerated = (result: GenerationResult) => void;
+
 /**
  * Google Gemini APIを使って画像を生成
+ * 各バリエーションが生成されるたびにコールバックを呼び出す
  */
 export async function generateStyleVariations(
   imageFile: File,
   parameters: StyleParameters,
   variationCount: number = 3,
+  onVariationGenerated?: OnVariationGenerated,
 ): Promise<GenerationResult[]> {
   if (!API_KEY) {
     throw new Error('Google API Key is not configured');
@@ -143,10 +147,17 @@ export async function generateStyleVariations(
               const imageMime = part.inlineData.mimeType || 'image/png';
               const dataUrl = `data:${imageMime};base64,${base64Image}`;
 
-              results.push({
+              const generatedResult = {
                 image_url: dataUrl,
                 variation_rank: i + 1,
-              });
+              };
+
+              results.push(generatedResult);
+
+              // コールバックを呼び出して即座に結果を通知
+              if (onVariationGenerated) {
+                onVariationGenerated(generatedResult);
+              }
 
               imageFound = true;
               console.log(`✓ Variation ${i + 1} generated successfully`);
@@ -163,10 +174,16 @@ export async function generateStyleVariations(
 
             // プレースホルダーを追加
             const colors = ['e3b7ff', 'ffb7c5', 'b7e3ff', 'ffe3b7'];
-            results.push({
+            const placeholderResult = {
               image_url: `https://placehold.co/800x1000/${colors[i]}/333?text=Variation+${i + 1}%0A%0AModel+returned+text`,
               variation_rank: i + 1,
-            });
+            };
+            results.push(placeholderResult);
+
+            // コールバックを呼び出す
+            if (onVariationGenerated) {
+              onVariationGenerated(placeholderResult);
+            }
           }
         }
 
@@ -179,10 +196,16 @@ export async function generateStyleVariations(
 
         // エラー時はプレースホルダーを追加
         const errorColors = ['ff9999', 'ffaa99', 'ffbb99', 'ffcc99'];
-        results.push({
+        const errorResult = {
           image_url: `https://placehold.co/800x1000/${errorColors[i]}/FFF?text=Error+${i + 1}%0A%0A${encodeURIComponent(error instanceof Error ? error.message.substring(0, 50) : 'Unknown error')}`,
           variation_rank: i + 1,
-        });
+        };
+        results.push(errorResult);
+
+        // コールバックを呼び出す
+        if (onVariationGenerated) {
+          onVariationGenerated(errorResult);
+        }
       }
     }
 

@@ -25,6 +25,7 @@ const COLOR_OPTIONS = [
   'レッド系',
   'オレンジ系',
   'イエロー系',
+  '金髪',
 ];
 const BANGS_OPTIONS = [
   'ぱっつん前髪',
@@ -97,49 +98,57 @@ export function StyleParametersPage() {
     setIsGenerating(true);
     setError(null);
 
+    // 生成ジョブを作成
+    const jobId = `job-${Date.now()}`;
+    const job: GenerationJob = {
+      id: jobId,
+      asset_id: assetId || '',
+      project_id: asset?.project_id || '',
+      parameters: parameters,
+      status: 'processing',
+      variation_count: 4,
+      created_by: 'user-1',
+      created_at: new Date().toISOString(),
+      started_at: new Date().toISOString(),
+    };
+
+    setCurrentJob(job);
+
+    // 初期状態では空の配列をセット
+    setVariations([]);
+
+    // ギャラリー画面に即座に遷移（生成中の状態で）
+    navigate(`/salon/assets/${assetId}/generation-gallery`);
+
     try {
-      // Google Gemini APIで生成
-      const results = await generateStyleVariations(
+      // Google Gemini APIで生成（バックグラウンドで実行）
+      await generateStyleVariations(
         currentAssetFile,
         parameters,
         4, // 4つのバリエーションを生成
+        // コールバック：1つ生成されるたびに呼ばれる
+        (result) => {
+          const newVariation: Variation = {
+            id: `var-${Date.now()}-${result.variation_rank}`,
+            generation_job_id: jobId,
+            variation_rank: result.variation_rank,
+            image_url: result.image_url,
+            status: 'draft' as const,
+            created_at: new Date().toISOString(),
+          };
+
+          // 既存のバリエーションに追加
+          setVariations((prev) => [...prev, newVariation]);
+        },
       );
 
-      // 生成ジョブを作成
-      const job: GenerationJob = {
-        id: `job-${Date.now()}`,
-        asset_id: assetId || '',
-        project_id: asset?.project_id || '',
-        parameters: parameters,
-        status: 'completed',
-        variation_count: results.length,
-        created_by: 'user-1',
-        created_at: new Date().toISOString(),
-        started_at: new Date().toISOString(),
-        completed_at: new Date().toISOString(),
-      };
-
-      // バリエーションを作成
-      const variations: Variation[] = results.map((result) => ({
-        id: `var-${Date.now()}-${result.variation_rank}`,
-        generation_job_id: job.id,
-        variation_rank: result.variation_rank,
-        image_url: result.image_url,
-        status: 'draft' as const,
-        created_at: new Date().toISOString(),
-      }));
-
-      // ステートに保存
-      setCurrentJob(job);
-      setVariations(variations);
-
+      // すべて完了
+      setCurrentJob({ ...job, status: 'completed', completed_at: new Date().toISOString() });
       setIsGenerating(false);
-
-      // 生成完了後は結果ギャラリーへ
-      navigate(`/salon/assets/${assetId}/generation-gallery`);
     } catch (err) {
       console.error('Generation error:', err);
       setError(err instanceof Error ? err.message : '画像生成中にエラーが発生しました');
+      setCurrentJob({ ...job, status: 'failed' });
       setIsGenerating(false);
     }
   };

@@ -10,11 +10,18 @@ export function GenerationGallery() {
   const { assetId } = useParams<{ assetId: string }>();
   const navigate = useNavigate();
 
-  const { currentAsset, variations: storeVariations, setVariations } = useGenerationStore();
+  const {
+    currentAsset,
+    currentJob,
+    variations: storeVariations,
+    setVariations,
+  } = useGenerationStore();
 
   const asset = currentAsset || mockAssets.find((a) => a.id === assetId);
   // ストアのバリエーションがあればそれを使用、なければmockを使用
   const variations = storeVariations.length > 0 ? storeVariations : mockVariations;
+
+  const isGenerating = currentJob?.status === 'processing';
 
   const [selectedVariation, setSelectedVariation] = useState<string | null>(null);
   const [reviewComment, setReviewComment] = useState('');
@@ -148,6 +155,39 @@ export function GenerationGallery() {
         <div className="lg:col-span-2">
           <Card className="p-6">
             <h2 className="mb-4 text-lg font-semibold">スタイルバリエーション</h2>
+
+            {/* 元画像 */}
+            <div className="mb-6">
+              <h3 className="mb-3 text-sm font-medium text-gray-600">元画像</h3>
+              <div className="aspect-[4/5] max-w-xs overflow-hidden rounded-lg border-2 border-gray-200 bg-gray-100">
+                <img
+                  src={asset.original_url}
+                  alt="Original"
+                  className="h-full w-full object-cover"
+                />
+              </div>
+            </div>
+
+            <h3 className="mb-3 text-sm font-medium text-gray-600">
+              生成されたスタイル
+              {isGenerating && (
+                <span className="ml-2 text-blue-600">
+                  ({variations.length}/{currentJob?.variation_count || 4} 生成中...)
+                </span>
+              )}
+            </h3>
+
+            {isGenerating && variations.length === 0 && (
+              <div className="mb-4 rounded-lg bg-blue-50 p-4">
+                <div className="flex items-center gap-3">
+                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+                  <p className="text-sm text-blue-800">
+                    スタイルを生成中です... 生成されたものから順に表示されます
+                  </p>
+                </div>
+              </div>
+            )}
+
             <div className="grid gap-4 md:grid-cols-2">
               {variations.map((variation) => {
                 const review = reviews.find((r) => r.variation_id === variation.id);

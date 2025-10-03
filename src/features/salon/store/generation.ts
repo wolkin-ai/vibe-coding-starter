@@ -13,7 +13,7 @@ interface GenerationStore {
   // Actions
   setCurrentAsset: (asset: Asset, file: File) => void;
   setCurrentJob: (job: GenerationJob) => void;
-  setVariations: (variations: Variation[]) => void;
+  setVariations: (variations: Variation[] | ((prev: Variation[]) => Variation[])) => void;
   clearGeneration: () => void;
 }
 
@@ -27,7 +27,10 @@ export const useGenerationStore = create<GenerationStore>((set) => ({
 
   setCurrentJob: (job) => set({ currentJob: job }),
 
-  setVariations: (variations) => set({ variations }),
+  setVariations: (variations) =>
+    set((state) => ({
+      variations: typeof variations === 'function' ? variations(state.variations) : variations,
+    })),
 
   clearGeneration: () =>
     set({
