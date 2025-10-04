@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '../../../shared/ui/Button';
 import { Card } from '../../../shared/ui/Card';
 import { useCatalogStore } from '../store/catalog';
@@ -88,6 +88,7 @@ interface GenerationParams {
 }
 
 export function GenerateModel() {
+  const { themeId } = useParams<{ themeId: string }>();
   const navigate = useNavigate();
   const { addModel } = useCatalogStore();
 
@@ -143,6 +144,7 @@ export function GenerateModel() {
 
     const newModel = {
       id: `model-${Date.now()}`,
+      brand_theme_id: themeId,
       gender: selected.params.gender,
       age_range: selected.params.age_range,
       face_type: selected.params.face_type,
@@ -162,13 +164,13 @@ export function GenerateModel() {
     };
 
     addModel(newModel);
-    navigate('/catalog');
+    navigate(`/catalog/themes/${themeId}`);
   };
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 p-6">
       <div className="flex items-center gap-3">
-        <Button variant="outline" onClick={() => navigate('/catalog')}>
+        <Button variant="outline" onClick={() => navigate(`/catalog/themes/${themeId}`)}>
           ← 戻る
         </Button>
         <div>

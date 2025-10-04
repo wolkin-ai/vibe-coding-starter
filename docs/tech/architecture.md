@@ -2,50 +2,50 @@
 
 ## 全体構成
 
-- **フロントエンド**：Next.js (App Router) + Tailwind。ブランドテーマ設定、モデル生成操作、ギャラリー管理を提供。
-- **API層**：Next.js API Routes（またはFastAPI）で以下の機能を提供。
-  - Prompt Builder：ブランドテーマ・ヘアパラメータ・参照画像を統合したテンプレート生成
-  - Generation Controller：Gemini API呼び出し、ジョブ登録、コスト見積り
-  - Asset Service：ストレージ署名URLの発行、SynthIDメタ情報保存
-- **ジョブワーカー**：Node.js + BullMQ（Redis）で非同期処理。生成リクエストのキューイング、完了後のアセット登録、コスト集計を担当。
-- **データベース**：PostgreSQL（Supabase）。主要テーブル：
-  - `brand_themes`（カラー/キーワード/ターゲット）
-  - `cut_models`（生成モデル情報、favoriteフラグ、seed）
-  - `hair_styles`（カタログエントリ、参照画像リンク、状態）
-  - `generation_jobs`（type, batch_size, cost_estimate, status）
-  - `assets`（ストレージURL、SynthID、出力形式）
-  - `prompt_recipes`（ブランド共通プロンプトブロック）
-- **ストレージ**：S3互換（Supabase Storage想定）。`models/`, `catalog/`, `references/` バケットで分離し、生成履歴を保持。
-- **外部サービス**：Google Gemini 2.5 Flash Image API、（将来的に）コスト監視用BigQuery/Looker Studio。
+- **フロントエンド**：Next.js (App Router) + Tailwind。ムードプリセットの選択、カットモデル／スタイル生成、カタログ管理UIを提供。
+- **API層**：Next.js API Routes（またはFastAPI）で以下を担当。
+  - Prompt Builder：ムードヒント・ヘアパラメータ・参照画像を統合したプロンプト生成。
+  - Generation Controller：Gemini API呼び出し、ジョブ登録、コスト見積もり。
+  - Asset Service：ストレージ署名URLの発行、SynthID・メタ情報の保存。
+- **ジョブワーカー**：Node.js + BullMQ（Redis）。生成ジョブのキュー処理、完了後のアセット登録、コスト集計。
+- **データベース**：PostgreSQL（Supabase想定）。主要テーブル：
+  - `mood_presets`（システム提供のムードヒント、キーワード、カラーパレット）
+  - `cut_models`（生成モデル情報、お気に入り、ムード／パラメータスナップショット）
+  - `hair_styles`（カタログ項目、ステータス、参照画像リンク）
+  - `generation_jobs`（type, batch_size, cost_estimate, status, response_id）
+  - `assets`（ストレージURL、SynthID、出力フォーマット）
+  - `prompt_recipes`（ムード／用途ごとのプロンプトブロック）
+- **ストレージ**：S3互換（Supabase Storage想定）。`models/`, `catalog/`, `references/` など用途別にバケット分離。
+- **外部サービス**：Google Gemini 2.5 Flash Image API、将来的にはコストモニタリング用BigQuery/Looker Studio。
 
 ## データフロー
 
-1. ユーザーがブランドテーマを選択し、カットモデル生成をリクエスト。
-2. APIがPrompt Builderでテンプレートを生成→ジョブキューへ投入。
-3. ワーカーがGemini APIを呼び出し、生成画像をストレージへ保存。SynthIDとパラメータスナップショットを`assets`/`generation_jobs`に記録。
-4. ユーザーはギャラリーで結果を確認し、お気に入り登録→カタログに昇格。
-5. ヘアスタイル生成も同様に、モデル指定あり/なし、参照画像ありの場合は画像を追加で送信。
-6. ダウンロード要求時に所定フォーマット（1:1、4:5、3:4など）に変換し、署名付きURLを発行。
+1. ユーザーがムードプリセット（またはおまかせ）を選択し、カットモデル生成をリクエスト。
+2. APIがムードヒント＋入力パラメータでプロンプトを生成し、ジョブキューへ投入。
+3. ワーカーがGemini APIを呼び出し、生成画像をストレージへ保存。SynthIDとパラメータを`assets`/`generation_jobs`に記録。
+4. ユーザーはギャラリーで候補を確認し、タグ・ステータスを付与してカタログへ登録。
+5. ヘアスタイル生成（モデル指定／バッチ／スタイル転写）も同じフローで処理。
+6. エクスポート時に指定フォーマット（1:1, 4:5, 16:9）に変換し、署名付きURLを発行。
 
 ## 認証・権限
 
-- MVPでは社内利用想定のため、メールリンク認証（Supabase Auth）＋ワークスペース単位のRBAC（admin/designer/viewer）を予定。
-- 将来のマルチテナント化に備え、`workspaces`テーブルでブランドテーマ／資産をスコープ管理。
+- MVPは社内利用を想定。メールリンク認証（Supabase Auth）＋ワークスペース単位のロール（admin/designer/viewer）を提供。
+- 将来的なマルチワークスペース化を見据え、`workspaces`でムードプリセット・生成資産のスコープを管理。
 
 ## ロギングとコスト管理
 
-- 生成リクエスト／レスポンスの`responseId`・消費トークン・推定コストを`generation_jobs`に保存。
-- バッチ生成時は1枚ごとの採用フラグを保持し、採用単価を計算できるようにする。
-- アプリログは構造化JSONで収集し、エラーハンドリング・再試行パターンを可視化。
+- 生成リクエスト／レスポンスの `response_id`・消費トークン・推定コストを `generation_jobs` に保存。
+- バッチ生成では各バリエーションの採用フラグを記録し、採用単価を算出可能にする。
+- アプリログは構造化JSONで記録し、エラー／再試行をトレースできるようにする。
 
 ## セキュリティ
 
-- APIキーはSecret ManagerまたはSupabase Edge Configで管理し、クライアントからは参照不可。
-- 参照画像は社内素材のみとし、利用のたびに権限チェック。OSS画像やユーザー提供素材を分離保管。
-- SynthIDや生成メタデータを破棄せず、社外提出時に生成物であることを明示できるようにする。
+- Gemini APIキーは Secret Manager または Supabase Edge Config に保管し、クライアントからは不可視。
+- アップロードされた参照画像は社内用途限定。ライセンス区分・利用期限をメタ情報として保持。
+- SynthIDや生成メタデータを保存し、外部共有時にAI生成であることを明示できるようにする。
 
 ## 今後の拡張余地
 
-- 生成レシピのバージョン管理とABテスト
-- 生成結果に対するフィードバック学習（好みの傾向を自動学習してプロンプト補正）
-- Auto Layout機能（ブランドごとのLOOK BOOKやSNS投稿レイアウト生成）
+- ムードプリセットの編集・共有機能、A/Bテストによるプロンプトチューニング。
+- 生成結果へのフィードバック学習（好みの傾向を学習し、ムードヒントを自動補正）。
+- レイアウト自動生成（LOOK BOOK / SNSカルーセルなど）の追加。

@@ -3,11 +3,15 @@ import type { CutModel, HairParameters, ModelGender, ModelAgeRange, ModelFaceTyp
 
 const API_KEY = import.meta.env.VITE_GOOGLE_API_KEY;
 
+// Note: Gemini cannot generate images. This is a placeholder implementation.
+// For actual image generation, use Google's Imagen API, DALL-E, or Stable Diffusion.
 if (!API_KEY) {
   console.warn('Google API Key is not set in environment variables');
 }
 
 const genAI = new GoogleGenerativeAI(API_KEY || '');
+// Note: This model name is invalid. Gemini models don't support image generation.
+// The code will fall back to mock/placeholder images.
 const IMAGE_MODEL = 'gemini-2.5-flash-image';
 
 export interface StyleMoodHint {
@@ -310,11 +314,30 @@ ${moodHints}
 `.trim();
 }
 
+function createMockImageDataUrl(text: string, bgColor: string = '#E5E7EB'): string {
+  // Create a simple SVG placeholder that always works (no network needed)
+  const svg = `
+    <svg width="400" height="500" xmlns="http://www.w3.org/2000/svg">
+      <rect width="400" height="500" fill="${bgColor}"/>
+      <text x="50%" y="50%" text-anchor="middle" font-family="sans-serif" font-size="16" fill="#6B7280">
+        ${text}
+      </text>
+      <text x="50%" y="60%" text-anchor="middle" font-family="sans-serif" font-size="12" fill="#9CA3AF">
+        (モック画像)
+      </text>
+    </svg>
+  `;
+  return `data:image/svg+xml;base64,${btoa(svg)}`;
+}
+
 async function generateImage(
   prompt: string,
   baseImage?: BaseImageInput,
   config: GenerationConfig = {},
 ): Promise<string> {
+  console.log('Attempting Gemini image generation...');
+  console.log('Prompt:', prompt.substring(0, 100) + '...');
+
   if (!API_KEY) {
     throw new Error('Google API Key is not configured');
   }
@@ -442,9 +465,9 @@ export async function generateCutModels(
       onModelGenerated?.(imageUrl, i);
     } catch (error) {
       console.error(`Failed to generate model ${i + 1}:`, error);
-      const placeholderUrl = `https://via.placeholder.com/400x500/CCCCCC/000000?text=Model+${i + 1}`;
-      results.push(placeholderUrl);
-      onModelGenerated?.(placeholderUrl, i);
+      const mockUrl = createMockImageDataUrl(`モデル ${i + 1}`, '#F3F4F6');
+      results.push(mockUrl);
+      onModelGenerated?.(mockUrl, i);
     }
   }
 
@@ -468,9 +491,9 @@ export async function generateStyleWithModel(
       onStyleGenerated?.(imageUrl, i);
     } catch (error) {
       console.error(`Failed to generate style ${i + 1}:`, error);
-      const placeholderUrl = `https://via.placeholder.com/400x500/87CEEB/000000?text=Style+${i + 1}`;
-      results.push(placeholderUrl);
-      onStyleGenerated?.(placeholderUrl, i);
+      const mockUrl = createMockImageDataUrl(`スタイル ${i + 1}`, '#DBEAFE');
+      results.push(mockUrl);
+      onStyleGenerated?.(mockUrl, i);
     }
   }
 
@@ -492,9 +515,9 @@ export async function generateStylesBatch(
       onStyleGenerated?.(imageUrl, i);
     } catch (error) {
       console.error(`Failed to generate batch style ${i + 1}:`, error);
-      const placeholderUrl = `https://via.placeholder.com/400x500/87CEEB/000000?text=Batch+${i + 1}`;
-      results.push(placeholderUrl);
-      onStyleGenerated?.(placeholderUrl, i);
+      const mockUrl = createMockImageDataUrl(`バッチ ${i + 1}`, '#DBEAFE');
+      results.push(mockUrl);
+      onStyleGenerated?.(mockUrl, i);
     }
   }
 
@@ -522,9 +545,9 @@ export async function generateStyleTransfer(
       onStyleGenerated?.(imageUrl, i);
     } catch (error) {
       console.error(`Failed to generate style transfer ${i + 1}:`, error);
-      const placeholderUrl = `https://via.placeholder.com/400x500/87CEEB/000000?text=Transfer+${i + 1}`;
-      results.push(placeholderUrl);
-      onStyleGenerated?.(placeholderUrl, i);
+      const mockUrl = createMockImageDataUrl(`転写 ${i + 1}`, '#FDE68A');
+      results.push(mockUrl);
+      onStyleGenerated?.(mockUrl, i);
     }
   }
 

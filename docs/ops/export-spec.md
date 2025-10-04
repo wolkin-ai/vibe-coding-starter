@@ -12,7 +12,7 @@
 
 ## ファイル命名規則
 
-`<brand>_<collection>_<assetId>_<variant>.<ext>`
+`<workspace>_<mood>_<assetId>_<variant>.<ext>`
 
 - `variant`: `ig45`, `ig916`, `x32`, `hpb34`, `pdf` など
 - 生成日時をメタデータ（EXIF description）に記録
@@ -24,7 +24,7 @@
 ```json
 {
   "asset_id": "ast_20251004_001",
-  "brand_theme": "gal_core",
+  "mood_preset": "street_gal",
   "model_id": "mdl_20251004_012",
   "hair_recipe": {
     "length": "long",
@@ -51,5 +51,5 @@
 ## 注意点
 
 - 外部出力時は必ずキャプションに「AI生成ビジュアル」である旨を記載。
-- 動画化を行う場合は、静止画連番をAfter Effects等にインポートしやすいよう連番命名を付与（例：`brand_coll_001_ig916_01.png`）。
+- 動画化を行う場合は、静止画連番をAfter Effects等にインポートしやすいよう連番命名を付与（例：`workspace_mood_001_ig916_01.png`）。
 - Hot Pepper Beautyなど外部プラットフォームに転用する際は、最新の掲載ポリシーを別途確認すること。
