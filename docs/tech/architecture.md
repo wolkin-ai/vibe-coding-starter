@@ -1,55 +1,51 @@
-# システムアーキテクチャ概要
+# システムアーキテクチャ
 
 ## 全体構成
 
-- **フロントエンド**：Next.js (App Router)。SSRは認証済みページのみ。生成パラメータUIや比較ビューをクライアント側でレンダリング。
-- **バックエンドAPI**：Next.js API RoutesでRESTエンドポイントを提供。プロジェクト管理、生成ジョブ投入、承認操作を担う。
-- **ジョブワーカー**：Node.js + BullMQでRedisキューを処理。Google Gemini（Nano Banana）APIを呼び出し、複数スタイル案を生成。
-- **データベース**：Supabase PostgreSQL。主なテーブル：
-  - `salons`, `users`, `projects`
-  - `assets`（アップロード原画像）
-  - `style_presets`（保存済みパラメータ）
-  - `generation_jobs`（Gemini呼び出し単位）
-  - `variations`（生成結果）
-  - `reviews`（承認/却下・コメント）
-  - `audit_logs`
-- **ストレージ**：S3互換（Supabase Storage）。原画像は`raw/`、生成案は`variations/`、エクスポートは`snapshots/`等に分離。
-- **外部サービス**：Google Gemini API（公式APIキー認証）。βでは外部通知なし。
+- **フロントエンド**：Next.js (App Router) + Tailwind。ブランドテーマ設定、モデル生成操作、ギャラリー管理を提供。
+- **API層**：Next.js API Routes（またはFastAPI）で以下の機能を提供。
+  - Prompt Builder：ブランドテーマ・ヘアパラメータ・参照画像を統合したテンプレート生成
+  - Generation Controller：Gemini API呼び出し、ジョブ登録、コスト見積り
+  - Asset Service：ストレージ署名URLの発行、SynthIDメタ情報保存
+- **ジョブワーカー**：Node.js + BullMQ（Redis）で非同期処理。生成リクエストのキューイング、完了後のアセット登録、コスト集計を担当。
+- **データベース**：PostgreSQL（Supabase）。主要テーブル：
+  - `brand_themes`（カラー/キーワード/ターゲット）
+  - `cut_models`（生成モデル情報、favoriteフラグ、seed）
+  - `hair_styles`（カタログエントリ、参照画像リンク、状態）
+  - `generation_jobs`（type, batch_size, cost_estimate, status）
+  - `assets`（ストレージURL、SynthID、出力形式）
+  - `prompt_recipes`（ブランド共通プロンプトブロック）
+- **ストレージ**：S3互換（Supabase Storage想定）。`models/`, `catalog/`, `references/` バケットで分離し、生成履歴を保持。
+- **外部サービス**：Google Gemini 2.5 Flash Image API、（将来的に）コスト監視用BigQuery/Looker Studio。
 
 ## データフロー
 
-1. ユーザーがプロジェクトを選択し、原画像をアップロード。`assets`レコードと`raw/`バケットに保存。
-2. スタイルパラメータ（プリセットまたはカスタム）を設定し、生成ジョブをAPIに送信。
-3. ジョブワーカーがGoogle Gemini Image APIを呼び出し、複数のスタイル案を生成。各案を`variations`レコードとして保存し、画像は`variations/`バケットに配置。
-4. UIはSupabase Realtimeまたはポーリングで生成完了を検知し、ギャラリーに表示。
-5. スタイリストが各案に対して承認/却下/メモを付与。結果は`reviews`テーブルに保存。
-6. 承認済み案だけをエクスポートAPIでダウンロードURL化し、顧客共有やSNS出力に利用。
+1. ユーザーがブランドテーマを選択し、カットモデル生成をリクエスト。
+2. APIがPrompt Builderでテンプレートを生成→ジョブキューへ投入。
+3. ワーカーがGemini APIを呼び出し、生成画像をストレージへ保存。SynthIDとパラメータスナップショットを`assets`/`generation_jobs`に記録。
+4. ユーザーはギャラリーで結果を確認し、お気に入り登録→カタログに昇格。
+5. ヘアスタイル生成も同様に、モデル指定あり/なし、参照画像ありの場合は画像を追加で送信。
+6. ダウンロード要求時に所定フォーマット（1:1、4:5、3:4など）に変換し、署名付きURLを発行。
 
 ## 認証・権限
 
-- Supabase Authのメールリンク認証を利用。
-- ロールは`owner`, `manager`, `stylist`, `external_collaborator`をenumで管理。承認権限は`manager`以上。
-- APIアクセス時にミドルウェアでトークン検証し、各エンドポイントでロールを再チェック。
+- MVPでは社内利用想定のため、メールリンク認証（Supabase Auth）＋ワークスペース単位のRBAC（admin/designer/viewer）を予定。
+- 将来のマルチテナント化に備え、`workspaces`テーブルでブランドテーマ／資産をスコープ管理。
 
-## 設定・環境変数（例）
+## ロギングとコスト管理
 
-- `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`
-- `GOOGLE_API_KEY`, `GOOGLE_VERTEX_PROJECT_ID`, `GOOGLE_VERTEX_LOCATION`
-- `GOOGLE_GEMINI_IMAGE_MODEL`（例：`gemini-2.5-flash-image`）
-- `REDIS_URL`
-- `RAW_BUCKET`, `VARIATION_BUCKET`, `SNAPSHOT_BUCKET`
-- `GENERATION_VARIATION_LIMIT`（例：3〜5枚）
-- `MAX_IMAGE_SIZE_MB`
+- 生成リクエスト／レスポンスの`responseId`・消費トークン・推定コストを`generation_jobs`に保存。
+- バッチ生成時は1枚ごとの採用フラグを保持し、採用単価を計算できるようにする。
+- アプリログは構造化JSONで収集し、エラーハンドリング・再試行パターンを可視化。
 
-## ログ・監査
+## セキュリティ
 
-- アプリログ：構造化JSONを採用し、生成ジョブID・ユーザーIDを必ず記録。
-- 生成ログ：`generation_jobs`にリクエストパラメータ、レスポンス`responseId`、ステータス、処理時間を保存。
-- 操作ログ：`audit_logs`に承認/却下やエクスポート操作を記録。
+- APIキーはSecret ManagerまたはSupabase Edge Configで管理し、クライアントからは参照不可。
+- 参照画像は社内素材のみとし、利用のたびに権限チェック。OSS画像やユーザー提供素材を分離保管。
+- SynthIDや生成メタデータを破棄せず、社外提出時に生成物であることを明示できるようにする。
 
-## セキュリティ方針
+## 今後の拡張余地
 
-- アップロード画像はSSE-KMS相当で暗号化。署名URLの有効期限は5分以下に制限。
-- Google APIキーはサーバー側にのみ配置し、Secret Managerから読み込む。
-- 生成画像にGoogleのSynthID透かしが付与される点を利用規約に明記し、除去は行わない。
-- 不要な生成案はプロジェクト終了時に自動削除するポリシーを検討。
+- 生成レシピのバージョン管理とABテスト
+- 生成結果に対するフィードバック学習（好みの傾向を自動学習してプロンプト補正）
+- Auto Layout機能（ブランドごとのLOOK BOOKやSNS投稿レイアウト生成）

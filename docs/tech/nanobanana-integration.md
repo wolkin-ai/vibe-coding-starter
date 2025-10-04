@@ -1,73 +1,67 @@
-# Google Gemini（Nano Banana）連携設計
+# Google Gemini 2.5 Flash Image 連携設計
 
-## 役割と目的
+## 役割
 
-- アップロード画像をもとに、長さ・カラー・前髪・質感などのパラメータを反映したスタイル案を複数生成する。
-- 一つの生成ジョブから複数バリエーションを取得し、比較・承認のワークフローに連携する。
-- Google公式のAPIキー（Google AI StudioまたはVertex AI）で認証し、安定したSLAと安全対策を活用する。
+- ブランドテーマ／ヘアスタイルレシピに基づいた高解像度のカットモデル・ヘアカタログ画像を生成する。
+- モデル一貫性（同一人物での髪型変更）とスタイル転写（参照画像の髪型を適用）を実現する。
+- 生成枚数とコストを制御し、SynthIDを含むメタデータを取得して保存する。
 
 ## 接続構成
 
 ```
-Front → API Route → Job Queue → Worker → Google Gemini Image API → Worker → DB / Storage
+Front (Next.js)
+  ↓ REST
+API Route /generate
+  ↓ BullMQ
+Worker (Node.js)
+  ↓ HTTPS (Google API)
+Gemini 2.5 Flash Image
+  ↓
+Storage (S3) + DB (Supabase)
 ```
 
-- ジョブワーカーはBullMQ上で`StyleGenerationJob`を処理し、Gemini APIから取得した各バリエーションを`variations`テーブルとストレージに保存。
-- APIキーはサーバー側環境変数`GOOGLE_API_KEY`（またはサービスアカウント認証）で管理し、クライアントからは参照不可。
-- Vertex AIへ移行する場合も同じアダプターインターフェースを利用できるよう、インフラ層を抽象化する。
+## プロンプトビルド戦略
 
-## API呼び出し仕様
+- **ステップ分割**：
+  1. カットモデル生成（ブランドテーマ・骨格・メイク・背景）
+  2. ヘアスタイル生成 or 参照適用（既存モデル画像 + ヘアパラメータ or 参照画像）
+- **テンプレ構成要素**：
+  - テイスト（ギャル／モード／フェミニン等）、カラーキーワード、ライティング
+  - モデル属性（年齢帯、顔型、表情、骨格、肌トーン）
+  - ヘアパラメータ（長さ、ボリューム、前髪、質感、カラー処理）
+  - 撮影設定（レンズ感、背景シーン）
+- プロンプトはJSONテンプレートで管理し、ブランドテーマごとにブロック差し替え可能にする。
 
-- エンドポイント（REST）
-  - `POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent`
-  - 公式SDK（`@google/generative-ai`）利用を推奨。gRPC/RESTを切り替えられる。
-- リクエスト組み立て
-  - ベース画像を`inline_data`で送信（JPEG/PNG）。
-  - パラメータUIで指定された値をプロンプトテンプレートに埋め込み、髪の長さ・カラー・前髪・質感などを自然言語で指示。
-  - `generationConfig.responseMimeType`で戻りの形式を指定（例：`image/png`）。
-- マルチバリエーション
-  - `candidateCount`（SDK）または複数回の呼び出しで3〜5案を取得。
-  - 各案に`variation_rank`を付与し保存。
-- レスポンス処理
-  - `candidates[*].content.parts[].inline_data.data`から画像データを取り出しBase64デコード。
-  - `safetyRatings`は不適切コンテンツの検知に利用し、`variations`に警告フラグを保存。
+## 参照画像適用
 
-## ジョブ設計とリトライ
+- `generateContent` APIにベースモデル画像とヘア参照画像を複数`parts`として渡し、「ヘアスタイルを参考に同じ人物で再生成」と明示。
+- 参照画像は髪の領域が明確なものを推奨し、必要に応じて事前に背景マスクを作成。
+- 参照が実写／生成問わず利用可能だが、利用権限とライセンス情報を`assets`テーブルに保持する。
 
-- タイムアウト：標準30秒。`retry=2`（指数バックオフ）。
-- 制限レスポンス (`429`, `503`) は`Retry-After`を尊重。
-- ジョブ結果は`generation_jobs`に`status`, `started_at`, `finished_at`, `response_id`を保存。
-- 連続失敗時は運用アラート（Slack通知は後続フェーズ）とログレビューを実施。
+## バッチ生成
 
-## 環境変数・設定
+- `variationCount`相当の繰り返し呼び出しをアプリ側で制御し、温度・シードを微調整。
+- 1回のジョブで最大10枚まで。高品質確保のため、まず低解像度プレビュー（1024px）出力→採用候補のみ高解像度（1440px）再生成するモードを提供。
 
-- `GOOGLE_API_KEY`
-- `GOOGLE_VERTEX_PROJECT_ID`, `GOOGLE_VERTEX_LOCATION`（Vertex利用時）
-- `GOOGLE_GEMINI_IMAGE_MODEL`（既定：`gemini-2.5-flash-image`）
-- `GOOGLE_GEMINI_VARIATION_COUNT`（生成枚数）
-- `GOOGLE_GEMINI_STYLE_PROMPT_TEMPLATE`（JSON or YAMLで管理し、デプロイ時に読み込む）
-- `GOOGLE_GEMINI_SAFETY_LEVEL`（安全設定プリセット）
+## コスト見積り
 
-## ログ・モニタリング
+- 画像出力は約$0.039/枚（1024px） + 入力トークン課金。([ai.google.dev/pricing](https://ai.google.dev/pricing))
+- ジョブ投入時に `batch_size × 単価` を計算し、`generation_jobs.cost_estimate`に保存。完了後、Geminiレスポンスの使用トークンから実コストを再計算。
+- アカウント上限に近づいた場合はバッチサイズを自動調整し、通知を出す仕組みを検討。
 
-- `responseId`を`generation_jobs`および`audit_logs`に紐付ける。
-- 生成時間やエラー率をメトリクス化し、ダッシュボードで可視化。
-- コスト監視のため、Google CloudのUsageレポートを週次で確認。
+## エラーハンドリング
 
-## リージョンと制約
+- `429/503`：指数バックオフ＋最大3回リトライ。失敗時はジョブ`status = failed`、ユーザーへ再試行案内。
+- 安全設定ヒット：`safetyRatings`でブロックされた場合は、プロンプト調整または別テーマへの切り替えを提案。
+- 生成失敗（画像なし）はプレースホルダーを返しつつ、レスポンスのテキストをログ保存。
 
-- 利用可能リージョンはGoogle Cloud公式ドキュメントを参照。提供地域が限定される可能性があるため、接続時にバリデーションを行う。
-- `PERMISSION_DENIED`など地域制限が示唆されるレスポンスを受け取った際はジョブを`failed`にし、ユーザーへ警告を表示。
-- セーフティ設定で検出された不適切カテゴリは`variations.safety_flags`に保存し、承認画面に表示。
+## メタデータ管理
 
-## セキュリティ
+- 生成結果ごとに`responseId`、SynthID、プロンプトスナップショット、参照画像IDを保存。
+- 生成物が外部利用される際に「AI生成」であることを明示するため、SynthIDを削除しない。
 
-- APIキーはSecret Managerや1Passwordで管理し、実行時に環境変数へ注入。
-- 署名URLの有効期限は短く設定し、生成完了後に不要な原画像を消去できるオプションを提供。
-- Geminiが付与するSynthID透かしは保持し、顧客向け共有時に明示する。
+## セキュリティ・運用
 
-## 今後の拡張
-
-- サービスアカウントベースのVertex AI接続（企業アカウント向け）。
-- 生成案のバッチ比較やA/Bテスト機能。
-- 追加の制御（例：髪以外の領域固定、背景差し替え）をGemini Tools/Functionsで実現。
+- APIキーはサーバー側のみで保持し、CI/CDではSecret Managerを利用。
+- 生成画像は社内のみでレビューし、外部公開前に必ずブランド責任者がチェック。
+- 参照画像アップロード時に利用権限（社内撮影／素材サイト／生成AI等）を選択させ、監査ログを残す。

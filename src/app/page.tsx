@@ -90,9 +90,12 @@ export default function HomePage() {
             </ul>
           </div>
 
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-3">
             <Button asChild>
-              <Link to="/salon/projects">美容室アプリを試す</Link>
+              <Link to="/catalog/themes">カタログAI（新機能）</Link>
+            </Button>
+            <Button variant="outline" asChild>
+              <Link to="/salon/projects">美容室アプリ（旧版）</Link>
             </Button>
             <Button variant="outline" asChild>
               <Link to="/todos">Todoアプリを試す</Link>

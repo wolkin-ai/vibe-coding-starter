@@ -57,12 +57,39 @@ function buildPrompt(parameters: StyleParameters): string {
     parts.push(`- 全体イメージ: ${parameters.image_style}`);
   }
 
+  if (parameters.identity_shift) {
+    const identityDescriptions: Record<NonNullable<StyleParameters['identity_shift']>, string> = {
+      keep_similar: '本人とわかる程度に整える',
+      soft_change: '面影をうっすら残しつつ匿名化する',
+      distinct_new: '全く別人に見えるよう大きく変更する',
+    };
+    parts.push(`- 顔の匿名化レベル: ${identityDescriptions[parameters.identity_shift]}`);
+  }
+
+  if (parameters.makeup_style) {
+    const makeupDescriptions: Record<NonNullable<StyleParameters['makeup_style']>, string> = {
+      bare: 'メイクはほぼ行わず自然体に',
+      natural: 'ナチュラルメイクで清潔感を出す',
+      glam: '撮影向けのしっかりメイクで際立たせる',
+    };
+    parts.push(`- メイクの雰囲気: ${makeupDescriptions[parameters.makeup_style]}`);
+  }
+
+  if (parameters.retouch_level) {
+    const retouchDescriptions: Record<NonNullable<StyleParameters['retouch_level']>, string> = {
+      none: 'レタッチは不要',
+      light: '肌を整える程度の軽い補正を行う',
+      full: 'ライティングや肌を含め全体的にしっかり補正する',
+    };
+    parts.push(`- 補正レベル: ${retouchDescriptions[parameters.retouch_level]}`);
+  }
+
   if (parameters.custom_prompt) {
     parts.push(`\n追加の要望: ${parameters.custom_prompt}`);
   }
 
   parts.push(
-    '\n自然で実写的な仕上がりにしてください。顔の特徴は変えずに、髪型のみを変更してください。',
+    '\n自然で実写的な仕上がりにしてください。指定した匿名化レベルに合わせて顔立ちを調整しつつ、髪型やメイク、補正の度合いを指示通りに反映してください。',
   );
 
   return parts.join('\n');

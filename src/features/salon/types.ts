@@ -33,6 +33,9 @@ export interface StylePreset {
   bangs?: string;
   texture?: string;
   image_style?: string;
+  identity_shift?: IdentityShift;
+  makeup_style?: MakeupStyle;
+  retouch_level?: RetouchLevel;
   is_custom: boolean;
 }
 
@@ -43,7 +46,14 @@ export interface StyleParameters {
   texture?: string;
   image_style?: string;
   custom_prompt?: string;
+  identity_shift?: IdentityShift;
+  makeup_style?: MakeupStyle;
+  retouch_level?: RetouchLevel;
 }
+
+export type IdentityShift = 'keep_similar' | 'soft_change' | 'distinct_new';
+export type MakeupStyle = 'bare' | 'natural' | 'glam';
+export type RetouchLevel = 'none' | 'light' | 'full';
 
 export interface GenerationJob {
   id: string;

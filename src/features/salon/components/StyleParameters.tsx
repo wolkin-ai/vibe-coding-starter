@@ -53,6 +53,60 @@ const IMAGE_STYLE_OPTIONS = [
   'フェミニン',
 ];
 
+const IDENTITY_SHIFT_OPTIONS = [
+  {
+    value: 'keep_similar' as const,
+    label: '雰囲気はそのまま',
+    description: '本人とわかる範囲で軽く整える',
+  },
+  {
+    value: 'soft_change' as const,
+    label: '少し別人風',
+    description: '面影を残しつつ匿名化できる程度に変える',
+  },
+  {
+    value: 'distinct_new' as const,
+    label: '全く別人に',
+    description: '本人と特定されないよう顔立ちを大きく変更',
+  },
+];
+
+const MAKEUP_STYLE_OPTIONS = [
+  {
+    value: 'bare' as const,
+    label: 'すっぴん風',
+    description: 'メイクはほぼ加えず自然体に仕上げる',
+  },
+  {
+    value: 'natural' as const,
+    label: 'ナチュラル',
+    description: '清潔感のある自然メイクで整える',
+  },
+  {
+    value: 'glam' as const,
+    label: 'しっかりメイク',
+    description: '撮影向けに目元やリップを際立たせる',
+  },
+];
+
+const RETOUCH_LEVEL_OPTIONS = [
+  {
+    value: 'none' as const,
+    label: '補正なし',
+    description: '肌補正などは行わない',
+  },
+  {
+    value: 'light' as const,
+    label: '控えめ',
+    description: '肌を整える程度の軽い補正',
+  },
+  {
+    value: 'full' as const,
+    label: 'しっかり補正',
+    description: 'レタッチや明るさ調整を積極的に行う',
+  },
+];
+
 export function StyleParametersPage() {
   const { assetId } = useParams<{ assetId: string }>();
   const navigate = useNavigate();
@@ -79,12 +133,58 @@ export function StyleParametersPage() {
     const preset = mockStylePresets.find((p) => p.id === presetId);
     if (preset) {
       setSelectedPreset(presetId);
-      setParameters({
-        ...(preset.hair_length ? { hair_length: preset.hair_length } : {}),
-        ...(preset.color ? { color: preset.color } : {}),
-        ...(preset.bangs ? { bangs: preset.bangs } : {}),
-        ...(preset.texture ? { texture: preset.texture } : {}),
-        ...(preset.image_style ? { image_style: preset.image_style } : {}),
+      setParameters((prev) => {
+        const next: StyleParams = { ...prev };
+
+        if (preset.hair_length) {
+          next.hair_length = preset.hair_length;
+        } else {
+          delete next.hair_length;
+        }
+
+        if (preset.color) {
+          next.color = preset.color;
+        } else {
+          delete next.color;
+        }
+
+        if (preset.bangs) {
+          next.bangs = preset.bangs;
+        } else {
+          delete next.bangs;
+        }
+
+        if (preset.texture) {
+          next.texture = preset.texture;
+        } else {
+          delete next.texture;
+        }
+
+        if (preset.image_style) {
+          next.image_style = preset.image_style;
+        } else {
+          delete next.image_style;
+        }
+
+        if (preset.identity_shift) {
+          next.identity_shift = preset.identity_shift;
+        } else {
+          delete next.identity_shift;
+        }
+
+        if (preset.makeup_style) {
+          next.makeup_style = preset.makeup_style;
+        } else {
+          delete next.makeup_style;
+        }
+
+        if (preset.retouch_level) {
+          next.retouch_level = preset.retouch_level;
+        } else {
+          delete next.retouch_level;
+        }
+
+        return next;
       });
     }
   };
@@ -158,7 +258,11 @@ export function StyleParametersPage() {
     parameters.color ||
     parameters.bangs ||
     parameters.texture ||
-    parameters.image_style;
+    parameters.image_style ||
+    parameters.identity_shift ||
+    parameters.makeup_style ||
+    parameters.retouch_level ||
+    (parameters.custom_prompt && parameters.custom_prompt.trim().length > 0);
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 p-6">
@@ -218,6 +322,35 @@ export function StyleParametersPage() {
       <Card className="p-6">
         <h2 className="mb-4 text-lg font-semibold">詳細パラメータ</h2>
         <div className="space-y-6">
+          {/* 顔の匿名化レベル */}
+          <div>
+            <label className="mb-2 block font-medium">顔の匿名化レベル</label>
+            <div className="grid gap-3 md:grid-cols-3">
+              {IDENTITY_SHIFT_OPTIONS.map((option) => {
+                const isSelected = parameters.identity_shift === option.value;
+                return (
+                  <button
+                    key={option.value}
+                    onClick={() =>
+                      setParameters((prev) => ({
+                        ...prev,
+                        identity_shift: option.value,
+                      }))
+                    }
+                    className={`rounded-lg border-2 p-4 text-left transition-colors ${
+                      isSelected
+                        ? 'border-blue-600 bg-blue-50'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <p className="font-semibold">{option.label}</p>
+                    <p className="mt-2 text-xs text-gray-600">{option.description}</p>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           {/* 髪の長さ */}
           <div>
             <label className="mb-2 block font-medium">髪の長さ</label>
@@ -315,6 +448,65 @@ export function StyleParametersPage() {
                   {option}
                 </button>
               ))}
+            </div>
+          </div>
+
+          {/* メイクと補正 */}
+          <div className="grid gap-6 md:grid-cols-2">
+            <div>
+              <label className="mb-2 block font-medium">メイクの雰囲気</label>
+              <div className="space-y-2">
+                {MAKEUP_STYLE_OPTIONS.map((option) => {
+                  const isSelected = parameters.makeup_style === option.value;
+                  return (
+                    <button
+                      key={option.value}
+                      onClick={() =>
+                        setParameters((prev) => ({
+                          ...prev,
+                          makeup_style: option.value,
+                        }))
+                      }
+                      className={`w-full rounded-lg border-2 p-3 text-left transition-colors ${
+                        isSelected
+                          ? 'border-blue-600 bg-blue-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <p className="font-semibold">{option.label}</p>
+                      <p className="text-xs text-gray-600">{option.description}</p>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div>
+              <label className="mb-2 block font-medium">写真全体の補正</label>
+              <div className="space-y-2">
+                {RETOUCH_LEVEL_OPTIONS.map((option) => {
+                  const isSelected = parameters.retouch_level === option.value;
+                  return (
+                    <button
+                      key={option.value}
+                      onClick={() =>
+                        setParameters((prev) => ({
+                          ...prev,
+                          retouch_level: option.value,
+                        }))
+                      }
+                      className={`w-full rounded-lg border-2 p-3 text-left transition-colors ${
+                        isSelected
+                          ? 'border-blue-600 bg-blue-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <p className="font-semibold">{option.label}</p>
+                      <p className="text-xs text-gray-600">{option.description}</p>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
 

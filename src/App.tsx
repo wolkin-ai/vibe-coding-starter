@@ -11,6 +11,7 @@ import {
   GenerationGallery,
   ApprovedExport,
 } from './features/salon';
+import { GenerateModel, GenerateStyle, CatalogManagement } from './features/catalog';
 
 /**
  * Main App component
@@ -25,7 +26,12 @@ function App() {
         <Route path="/" element={<HomePage />} />
         <Route path="/todos" element={<TodosPage />} />
 
-        {/* Salon Management Routes */}
+        {/* Catalog AI Routes */}
+        <Route path="/catalog" element={<CatalogManagement />} />
+        <Route path="/catalog/generate-model" element={<GenerateModel />} />
+        <Route path="/catalog/generate-style" element={<GenerateStyle />} />
+
+        {/* Salon Management Routes (Legacy - for reference) */}
         <Route path="/salon/projects" element={<ProjectList />} />
         <Route path="/salon/projects/:projectId" element={<ProjectDetail />} />
         <Route path="/salon/projects/:projectId/upload" element={<AssetUpload />} />

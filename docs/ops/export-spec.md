@@ -1,41 +1,55 @@
-# 承認スタイル出力仕様（β）
+# 出力仕様（SNS / カタログ）
 
-## 出力形態
+## 対応フォーマット
 
-- 画像ファイル：`<projectId>_<variationId>_approved.jpg`
-- 共有用パッケージ（任意）：承認案をまとめたZIP（`<projectId>_approved_bundle.zip`）
-- メタ情報JSON（オプション）：`<projectId>_<variationId>.json`
+| 用途                    | アスペクト比  | 解像度（推奨） | 備考                                             |
+| ----------------------- | ------------- | -------------- | ------------------------------------------------ |
+| Instagram Feed          | 4:5           | 1350×1080      | キャプションテンプレ付きで書き出し               |
+| Instagram Reel / TikTok | 9:16          | 1920×1080      | 動画化を想定し、静止画は連番で書き出し           |
+| X (旧Twitter)           | 3:2           | 1800×1200      | 4枚までのカルーセル想定                          |
+| Hot Pepper Beauty 参考  | 3:4           | 1620×1215      | 実在モデルではない旨を記載（掲載可否は別途確認） |
+| 社内カタログPDF         | A4縦 / 300dpi | 2480×3508      | 複数画像をレイアウトテンプレに差し込み           |
 
-## 画像仕様
+## ファイル命名規則
 
-- 解像度：生成結果をそのまま保持（既定は1024〜1536pxの長辺）。必要に応じてダウンスケール。
-- カラープロファイル：sRGBを強制。
-- EXIF：個人情報に該当するタグは削除。生成情報（モデル名など）は`software`タグに簡潔に記録。
-- ファイル形式：JPEG（品質90）またはPNG。ユーザーが選択可能。
+`<brand>_<collection>_<assetId>_<variant>.<ext>`
 
-## メタ情報JSONフォーマット
+- `variant`: `ig45`, `ig916`, `x32`, `hpb34`, `pdf` など
+- 生成日時をメタデータ（EXIF description）に記録
 
-| Field           | Type     | Description                                  |
-| --------------- | -------- | -------------------------------------------- |
-| `variation_id`  | string   | 生成案ID                                     |
-| `project_id`    | string   | プロジェクトID                               |
-| `base_asset_id` | string   | 元画像ID                                     |
-| `parameters`    | object   | 使用したスタイルパラメータ（長さ、カラー等） |
-| `prompt`        | string   | 実際に送信したプロンプト全文                 |
-| `safety_flags`  | array    | GeminiのSafety警告コード                     |
-| `approved_by`   | string   | 承認者ユーザーID                             |
-| `approved_at`   | datetime | ISO8601                                      |
-| `notes`         | string   | 承認時のメモ                                 |
+## メタ情報JSON
 
-## エクスポートフロー
+出力時に以下のJSONを併出（例：`assetId_meta.json`）。
 
-1. UIで承認したタイミングで`reviews`が`approved`になり、`export_jobs`レコードを生成。
-2. ジョブワーカーが対象`variation`の画像を`variations/`から取得し、フォーマット変換・リサイズを実施。
-3. JSONメタ情報を生成して`snapshots/`バケットに保管。ZIP出力時は画像+JSONを同梱。
-4. 完了後に署名付きURLを生成し、UIに表示。メール/共有リンク連携は後続フェーズで対応。
+```json
+{
+  "asset_id": "ast_20251004_001",
+  "brand_theme": "gal_core",
+  "model_id": "mdl_20251004_012",
+  "hair_recipe": {
+    "length": "long",
+    "bangs": "see-through",
+    "color": "platinum beige",
+    "volume": "high",
+    "reference_asset_id": "ref_20250930_003"
+  },
+  "generation_job_id": "job_20251004_044",
+  "synth_id": "abc123",
+  "prompt_version": "v1.2",
+  "created_at": "2025-10-04T15:20:00Z"
+}
+```
 
-## エラー処理
+## エクスポート手順
 
-- バケット書き込み失敗時は`export_jobs.status`を`failed`にし、ユーザーへ再試行を促す。
-- 生成画像が失われている場合は`variations`のステータスを`missing`に更新し、再生成を提示。
-- Safetyフラグが`disallowed`の場合はエクスポートを許可しない。
+1. お気に入り登録済みアセットを選択し、用途別テンプレを選ぶ。
+2. バックエンドで画像を所定サイズへリサイズ／リフレーム。必要に応じて背景キャンバスを追加。
+3. メタ情報JSONを生成し、画像と一緒にZIPにまとめる。
+4. ZIPをS3アップロード → 署名付きURLを生成し、UIでダウンロード可能にする。
+5. ダウンロード履歴を記録し、コスト試算や利用状況レポートに活用する。
+
+## 注意点
+
+- 外部出力時は必ずキャプションに「AI生成ビジュアル」である旨を記載。
+- 動画化を行う場合は、静止画連番をAfter Effects等にインポートしやすいよう連番命名を付与（例：`brand_coll_001_ig916_01.png`）。
+- Hot Pepper Beautyなど外部プラットフォームに転用する際は、最新の掲載ポリシーを別途確認すること。
