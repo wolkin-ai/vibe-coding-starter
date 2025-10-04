@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+
 import { Button } from '../../../shared/ui/Button';
 import { Card } from '../../../shared/ui/Card';
-import { mockVariations, mockReviews } from '../mock-data';
+import { useReviews, useSalonProject } from '../hooks';
 
 export function ApprovedExport() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -10,8 +11,20 @@ export function ApprovedExport() {
   const [isExporting, setIsExporting] = useState(false);
   const [selectedVariations, setSelectedVariations] = useState<Set<string>>(new Set());
 
-  // 承認済みのバリエーションのみを表示
-  const approvedVariations = mockVariations.filter((v) => v.status === 'approved');
+  const { data: project, isLoading, isError, error, refetch } = useSalonProject(projectId);
+
+  const approvedVariations = useMemo(() => {
+    if (!project) return [];
+    return project.jobs
+      .flatMap((job) => job.variations)
+      .filter((variation) => variation.status === 'approved');
+  }, [project]);
+
+  const variationIds = useMemo(
+    () => approvedVariations.map((variation) => variation.id),
+    [approvedVariations],
+  );
+  const { data: reviews = [] } = useReviews(variationIds);
 
   const toggleVariation = (variationId: string) => {
     setSelectedVariations((prev) => {
@@ -26,7 +39,7 @@ export function ApprovedExport() {
   };
 
   const selectAll = () => {
-    setSelectedVariations(new Set(approvedVariations.map((v) => v.id)));
+    setSelectedVariations(new Set(approvedVariations.map((variation) => variation.id)));
   };
 
   const deselectAll = () => {
@@ -36,15 +49,45 @@ export function ApprovedExport() {
   const handleExport = async () => {
     if (selectedVariations.size === 0) return;
 
-    setIsExporting(true);
-    // モックエクスポート処理
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-    setIsExporting(false);
-
-    alert(
-      `${selectedVariations.size}案をエクスポートしました。\n\nエクスポート内容:\n- 高解像度画像 x${selectedVariations.size}\n- スタイル情報PDF\n- 共有用リンク`,
-    );
+    try {
+      setIsExporting(true);
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      alert(
+        `${selectedVariations.size}案をエクスポートしました。\n\nエクスポート内容:\n- 高解像度画像 x${selectedVariations.size}\n- スタイル情報PDF\n- 共有用リンク`,
+      );
+    } finally {
+      setIsExporting(false);
+    }
   };
+
+  if (isLoading) {
+    return (
+      <div className="p-6">
+        <Card className="p-6 text-center text-gray-500">読み込み中です...</Card>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="p-6">
+        <Card className="border-red-200 bg-red-50 p-6 text-sm text-red-700">
+          <p className="mb-4">データの取得に失敗しました: {error?.message}</p>
+          <Button variant="outline" onClick={() => refetch()}>
+            再読み込み
+          </Button>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!project) {
+    return (
+      <div className="p-6 text-center text-gray-600">
+        <p>プロジェクトが見つかりません</p>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 p-6">
@@ -60,7 +103,6 @@ export function ApprovedExport() {
         </Button>
       </div>
 
-      {/* 情報カード */}
       <Card className="border-l-4 border-l-blue-500 bg-blue-50 p-4">
         <div className="flex gap-3">
           <span className="text-2xl">ℹ️</span>
@@ -76,7 +118,6 @@ export function ApprovedExport() {
         </div>
       </Card>
 
-      {/* 選択コントロール */}
       <Card className="p-6">
         <div className="flex items-center justify-between">
           <div>
@@ -94,13 +135,12 @@ export function ApprovedExport() {
         </div>
       </Card>
 
-      {/* ギャラリー */}
       {approvedVariations.length > 0 ? (
         <>
           <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-4">
             {approvedVariations.map((variation) => {
               const isSelected = selectedVariations.has(variation.id);
-              const review = mockReviews.find((r) => r.variation_id === variation.id);
+              const review = reviews.find((r) => r.variation_id === variation.id);
 
               return (
                 <Card
@@ -118,16 +158,16 @@ export function ApprovedExport() {
                         className="h-full w-full object-cover"
                       />
                     </div>
-                    {isSelected && (
-                      <div className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-white">
-                        ✓
-                      </div>
-                    )}
                     <div className="absolute left-2 top-2">
                       <span className="rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-700">
                         承認済み
                       </span>
                     </div>
+                    {isSelected && (
+                      <div className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-white">
+                        ✓
+                      </div>
+                    )}
                   </div>
                   <div className="p-3">
                     <p className="font-medium">案 #{variation.variation_rank}</p>
@@ -143,7 +183,6 @@ export function ApprovedExport() {
             })}
           </div>
 
-          {/* エクスポートボタン */}
           <Card className="p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -202,13 +241,9 @@ export function ApprovedExport() {
           </Card>
         </>
       ) : (
-        <div className="py-12 text-center text-gray-500">
-          <p className="mb-2">承認済みのスタイルがまだありません</p>
-          <p className="text-sm">スタイルを生成して承認してからエクスポートしてください</p>
-          <Button className="mt-4" onClick={() => navigate(`/salon/projects/${projectId}`)}>
-            プロジェクトに戻る
-          </Button>
-        </div>
+        <Card className="p-12 text-center text-gray-500">
+          <p>承認済みのスタイルがありません</p>
+        </Card>
       )}
     </div>
   );

@@ -10,6 +10,7 @@ export interface Project {
   id: string;
   name: string;
   salon_id: string;
+  owner_id: string;
   created_at: string;
   updated_at: string;
   status: 'active' | 'archived';
@@ -19,10 +20,12 @@ export interface Asset {
   id: string;
   project_id: string;
   original_url: string;
+  storage_path: string;
   status: AssetStatus;
   uploaded_by: string;
   uploaded_at: string;
   description?: string;
+  metadata?: Record<string, unknown>;
 }
 
 export interface StylePreset {
@@ -78,6 +81,7 @@ export interface Variation {
   generation_job_id: string;
   variation_rank: number;
   image_url: string;
+  storage_path: string;
   status: VariationStatus;
   safety_flags?: string[];
   created_at: string;
@@ -100,4 +104,19 @@ export interface ExportJob {
   export_url?: string;
   created_at: string;
   completed_at?: string;
+}
+
+export interface GenerationJobWithVariations extends GenerationJob {
+  variations: Variation[];
+}
+
+export interface ProjectSummary extends Project {
+  asset_count: number;
+  variation_count: number;
+  approved_variation_count: number;
+}
+
+export interface ProjectDetail extends ProjectSummary {
+  assets: Asset[];
+  jobs: GenerationJobWithVariations[];
 }

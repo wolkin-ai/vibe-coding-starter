@@ -13,4 +13,3 @@ export type {
   Review,
   ExportJob,
 } from './types';
-export * from './mock-data';

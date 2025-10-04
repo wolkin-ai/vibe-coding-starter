@@ -3,15 +3,16 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '../../../shared/ui/Button';
 import { Card } from '../../../shared/ui/Card';
 import { useGenerationStore } from '../store/generation';
-import type { Asset } from '../types';
+import { useUploadAssetMutation } from '../hooks';
 
 export function AssetUpload() {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
-  const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const uploadMutation = useUploadAssetMutation();
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -37,35 +38,25 @@ export function AssetUpload() {
       return;
     }
 
-    setIsUploading(true);
-
-    // 最初の画像をアセットとして保存（実際はここでストレージにアップロード）
     const firstFile = uploadedFiles[0];
     if (!firstFile) {
-      setIsUploading(false);
       return;
     }
 
-    const assetId = `asset-${Date.now()}`;
+    try {
+      const asset = await uploadMutation.mutateAsync({
+        projectId,
+        file: firstFile,
+        description: `アップロード画像 - ${firstFile.name}`,
+      });
 
-    const newAsset: Asset = {
-      id: assetId,
-      project_id: projectId,
-      original_url: previewUrls[0] || '',
-      status: 'ready_for_generation',
-      uploaded_by: 'user-1',
-      uploaded_at: new Date().toISOString(),
-      description: `アップロード画像 - ${firstFile.name}`,
-    };
+      setCurrentAsset(asset, firstFile);
 
-    // グローバルステートに保存
-    setCurrentAsset(newAsset, firstFile);
-
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    setIsUploading(false);
-
-    // スタイルパラメータ設定画面へ
-    navigate(`/salon/assets/${assetId}/style-parameters`);
+      navigate(`/salon/assets/${asset.id}/style-parameters`);
+    } catch (error) {
+      console.error('Upload failed', error);
+      alert(error instanceof Error ? error.message : 'アップロードに失敗しました');
+    }
   };
 
   return (
@@ -173,8 +164,10 @@ export function AssetUpload() {
             >
               すべてクリア
             </Button>
-            <Button onClick={handleUpload} disabled={isUploading}>
-              {isUploading ? 'アップロード中...' : `${uploadedFiles.length}枚をアップロード`}
+            <Button onClick={handleUpload} disabled={uploadMutation.isPending}>
+              {uploadMutation.isPending
+                ? 'アップロード中...'
+                : `${uploadedFiles.length}枚をアップロード`}
             </Button>
           </div>
         </Card>

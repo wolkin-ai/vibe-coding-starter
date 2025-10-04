@@ -1,33 +1,71 @@
+import { useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+
 import { Button } from '../../../shared/ui/Button';
 import { Card } from '../../../shared/ui/Card';
-import { mockAssets, mockProjects, mockVariations, mockGenerationJobs } from '../mock-data';
+import { useSalonProject } from '../hooks';
 
 export function ProjectDetail() {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
 
-  const project = mockProjects.find((p) => p.id === projectId);
-  const assets = mockAssets.filter((a) => a.project_id === projectId);
-  const jobs = mockGenerationJobs.filter((j) => j.project_id === projectId);
-  const totalVariations = mockVariations.filter((v) =>
-    jobs.some((j) => j.id === v.generation_job_id),
-  );
+  const { data: project, isLoading, isError, error, refetch } = useSalonProject(projectId);
 
-  if (!project) {
+  const variationCounts = useMemo(() => {
+    if (!project) {
+      return { draft: 0, reviewing: 0, approved: 0, rejected: 0 } as const;
+    }
+
+    const base: Record<'draft' | 'reviewing' | 'approved' | 'rejected', number> = {
+      draft: 0,
+      reviewing: 0,
+      approved: 0,
+      rejected: 0,
+    };
+
+    return project.jobs.reduce(
+      (acc, job) => {
+        job.variations.forEach((variation) => {
+          acc[variation.status] += 1;
+        });
+        return acc;
+      },
+      { ...base },
+    );
+  }, [project]);
+
+  if (isLoading) {
     return (
-      <div className="p-6 text-center">
-        <p className="text-gray-600">プロジェクトが見つかりません</p>
+      <div className="p-6">
+        <Card className="p-6 text-center text-gray-500">読み込み中です...</Card>
       </div>
     );
   }
 
-  const variationCounts = {
-    draft: totalVariations.filter((v) => v.status === 'draft').length,
-    reviewing: totalVariations.filter((v) => v.status === 'reviewing').length,
-    approved: totalVariations.filter((v) => v.status === 'approved').length,
-    rejected: totalVariations.filter((v) => v.status === 'rejected').length,
-  };
+  if (isError) {
+    return (
+      <div className="p-6">
+        <Card className="border-red-200 bg-red-50 p-6 text-sm text-red-700">
+          <p className="mb-4">プロジェクトの取得に失敗しました: {error?.message}</p>
+          <Button variant="outline" onClick={() => refetch()}>
+            再読み込み
+          </Button>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!project) {
+    return (
+      <div className="p-6 text-center text-gray-600">
+        <p>プロジェクトが見つかりません</p>
+      </div>
+    );
+  }
+
+  const assets = project.assets;
+  const jobs = project.jobs;
+  const totalVariations = jobs.flatMap((job) => job.variations);
 
   const getStatusLabel = (status: string) => {
     const labels: Record<string, string> = {
@@ -38,7 +76,7 @@ export function ProjectDetail() {
       approved: '承認済み',
       rejected: '却下',
     };
-    return labels[status] || status;
+    return labels[status] ?? status;
   };
 
   const getStatusColor = (status: string) => {
@@ -50,12 +88,11 @@ export function ProjectDetail() {
       approved: 'bg-green-100 text-green-700',
       rejected: 'bg-red-100 text-red-700',
     };
-    return colors[status] || 'bg-gray-100 text-gray-700';
+    return colors[status] ?? 'bg-gray-100 text-gray-700';
   };
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 p-6">
-      {/* ヘッダー */}
       <div className="flex items-start justify-between">
         <div>
           <div className="flex items-center gap-3">
@@ -84,35 +121,25 @@ export function ProjectDetail() {
         </div>
       </div>
 
-      {/* 統計情報 */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card className="p-4">
-          <div className="space-y-2">
-            <p className="text-sm text-gray-600">元画像</p>
-            <p className="text-2xl font-bold">{assets.length}</p>
-          </div>
+          <p className="text-sm text-gray-600">元画像</p>
+          <p className="text-2xl font-bold">{assets.length}</p>
         </Card>
         <Card className="p-4">
-          <div className="space-y-2">
-            <p className="text-sm text-gray-600">生成ジョブ</p>
-            <p className="text-2xl font-bold">{jobs.length}</p>
-          </div>
+          <p className="text-sm text-gray-600">生成ジョブ</p>
+          <p className="text-2xl font-bold">{jobs.length}</p>
         </Card>
         <Card className="p-4">
-          <div className="space-y-2">
-            <p className="text-sm text-gray-600">生成バリエーション</p>
-            <p className="text-2xl font-bold">{totalVariations.length}</p>
-          </div>
+          <p className="text-sm text-gray-600">生成バリエーション</p>
+          <p className="text-2xl font-bold">{totalVariations.length}</p>
         </Card>
         <Card className="p-4">
-          <div className="space-y-2">
-            <p className="text-sm text-gray-600">承認済み</p>
-            <p className="text-2xl font-bold text-green-600">{variationCounts.approved}</p>
-          </div>
+          <p className="text-sm text-gray-600">承認済み</p>
+          <p className="text-2xl font-bold text-green-600">{variationCounts.approved}</p>
         </Card>
       </div>
 
-      {/* クイックアクション */}
       <Card className="p-6">
         <h2 className="mb-4 text-lg font-semibold">クイックアクション</h2>
         <div className="flex flex-wrap gap-3">
@@ -135,7 +162,6 @@ export function ProjectDetail() {
         </div>
       </Card>
 
-      {/* 画像一覧 */}
       <Card className="p-6">
         <h2 className="mb-4 text-lg font-semibold">画像一覧 ({assets.length}枚)</h2>
 

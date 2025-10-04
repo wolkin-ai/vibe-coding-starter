@@ -351,20 +351,55 @@ const VARIATION_ELEMENTS = {
 
 type VariationCategory = keyof typeof VARIATION_ELEMENTS;
 
-const VARIATION_OUTPUT_CONFIG: Record<VariationCategory, { label: string; count: number }> = {
-  expressions: { label: '表情バリエーション', count: 2 },
-  poses: { label: 'ポーズ案', count: 2 },
-  accessories: { label: 'アクセサリー候補', count: 2 },
-  lighting: { label: '照明プラン', count: 1 },
-  backgrounds: { label: '背景・ロケーション', count: 2 },
-  makeupVariations: { label: 'メイク方向性', count: 2 },
-  environments: { label: '撮影環境', count: 1 },
-  storytelling: { label: 'ストーリーフック', count: 1 },
-  cameraSettings: { label: 'カメラ設定', count: 1 },
+type VariationProfile = 'default' | 'high' | 'controlled';
+
+const VARIATION_CATEGORY_LABELS: Record<VariationCategory, string> = {
+  expressions: '表情バリエーション',
+  poses: 'ポーズ案',
+  accessories: 'アクセサリー候補',
+  lighting: '照明プラン',
+  backgrounds: '背景・ロケーション',
+  makeupVariations: 'メイク方向性',
+  environments: '撮影環境',
+  storytelling: 'ストーリーフック',
+  cameraSettings: 'カメラ設定',
+};
+
+const VARIATION_COUNT_PRESETS: Record<
+  VariationProfile,
+  Partial<Record<VariationCategory, number>>
+> = {
+  default: {
+    expressions: 2,
+    poses: 2,
+    accessories: 2,
+    lighting: 1,
+    backgrounds: 2,
+    makeupVariations: 2,
+    environments: 1,
+    storytelling: 1,
+    cameraSettings: 1,
+  },
+  high: {
+    expressions: 3,
+    poses: 3,
+    accessories: 3,
+    backgrounds: 3,
+    environments: 2,
+    storytelling: 2,
+  },
+  controlled: {
+    expressions: 1,
+    poses: 1,
+    accessories: 1,
+    backgrounds: 1,
+    makeupVariations: 1,
+  },
 };
 
 interface RandomVariationOptions {
   excludeCategories?: VariationCategory[];
+  profile?: VariationProfile;
 }
 
 function randomPickMany<T>(array: T[], count: number): T[] {
@@ -425,6 +460,8 @@ interface RandomVariationResult {
 
 function generateRandomVariations(options: RandomVariationOptions = {}): RandomVariationResult {
   const excludeSet = new Set<VariationCategory>(options.excludeCategories ?? []);
+  const profile = options.profile ?? 'default';
+  const profileCounts = VARIATION_COUNT_PRESETS[profile] ?? {};
   const variations: string[] = [];
   const signatureParts: string[] = [];
 
@@ -433,14 +470,17 @@ function generateRandomVariations(options: RandomVariationOptions = {}): RandomV
       return;
     }
 
-    const config = VARIATION_OUTPUT_CONFIG[category];
-    const elements = randomPickMany(VARIATION_ELEMENTS[category], config.count);
+    const baseCount = VARIATION_COUNT_PRESETS.default[category] ?? 1;
+    const requestedCount = profileCounts[category] ?? baseCount;
+    const count = Math.max(1, Math.min(VARIATION_ELEMENTS[category].length, requestedCount));
+    const elements = randomPickMany(VARIATION_ELEMENTS[category], count);
 
     if (!elements.length) {
       return;
     }
 
-    variations.push(`- ${config.label}: ${elements.join(' / ')}`);
+    const label = VARIATION_CATEGORY_LABELS[category];
+    variations.push(`- ${label}: ${elements.join(' / ')}`);
     signatureParts.push(...elements);
   });
 
@@ -485,7 +525,16 @@ function buildModelPrompt(
   const ageLabel = describeModelAge(ageRange);
   const faceLabel = describeModelFace(faceType);
   const moodHints = compileMoodHints(mood);
-  const { description: randomVariations, signatureParts } = generateRandomVariations();
+  const variationOptions: RandomVariationOptions = hasReferenceImage
+    ? {
+        profile: 'controlled',
+        excludeCategories: ['expressions', 'poses', 'makeupVariations'],
+      }
+    : {
+        profile: 'high',
+      };
+  const { description: randomVariations, signatureParts } =
+    generateRandomVariations(variationOptions);
   const hairPreferenceDetails = formatModelHairPreferences(hairPreferences);
   const trimmedNote = additionalNote?.trim();
   const hairPreferenceSeedParts = hairPreferences
@@ -506,61 +555,93 @@ function buildModelPrompt(
     mood?.id ?? 'free',
     ...hairPreferenceSeedParts,
     trimmedNote && trimmedNote.length ? trimmedNote : 'note-free',
+    hasReferenceImage ? 'face-lock' : 'face-open',
     ...signatureParts,
   ]);
-  const hairProfileInstruction = hairPreferenceDetails
-    ? `- 髪型: 指定のベース条件を反映\n${hairPreferenceDetails}`
-    : '- 髪型: 後工程で多様なスタイルに活用できるナチュラルなベースカット';
+  const intro = [
+    '画像を生成してください。',
+    '日本の美容室カタログに掲載するフォトリアルなモデル写真を制作します。',
+  ].join('\n');
 
-  const referenceImageInstruction = hasReferenceImage
-    ? `
-【参考画像について】
-添付された画像を参考にして、モデルの外見の一貫性を保ってください。
-- 顔の特徴、表情、雰囲気を参考にしてください
-- 同じモデルとして認識できるレベルの一貫性を目指してください
-- ただし、指定された髪型や年齢帯などの要件は必ず反映してください
-`
+  const referenceSection = hasReferenceImage
+    ? buildPromptSection('参考画像', [
+        '添付された画像のモデルをベースとして、同一人物と認識できる範囲で生成する。',
+        '顔保持ルール:',
+        '  - 輪郭・骨格・目・鼻・口・眉の形状と配置を変更しない',
+        '  - 表情・肌質・肌トーンを一致させ、過度な補正は行わない',
+        '  - カメラアングルやポーズの変化は±10度以内の微調整に留める',
+      ])
     : '';
 
-  return `
-画像を生成してください。
-日本の美容室カタログに掲載するフォトリアルなモデル写真を制作します。
-${referenceImageInstruction}
+  const modelSection = buildPromptSection('モデル設定', [
+    `- 性別: ${genderLabel}`,
+    `- 年齢層: ${ageLabel}`,
+    `- 顔型: ${faceLabel}`,
+    `- ターゲット層: ${mood?.targetAudience ?? '幅広い年代'}`,
+    `- メイク: ${mood?.makeupStyle ?? 'J-beautyらしい自然なメイク'}`,
+  ]);
 
-【目的】
-- 日本人女性モデルの美容室カタログ撮影
-- ターゲット層: ${mood?.targetAudience ?? '幅広い年代'}
+  const hairProfileInstruction = hairPreferenceDetails
+    ? `- ヘアベース条件: 指定のベース設定を反映\n${hairPreferenceDetails}`
+    : '- ヘアベース: 後工程で多様なスタイルに展開できるナチュラルなカット';
+  const hairSection = buildPromptSection('ヘアベース', [
+    hairProfileInstruction,
+    trimmedNote ? `- 追加メモ: ${trimmedNote}` : undefined,
+  ]);
 
-【モデル条件】
-- 国籍/人種: 日本人女性
-- 性別: ${genderLabel}
-- 年齢層: ${ageLabel}
-- 顔型: ${faceLabel}
-${hairProfileInstruction}
-- メイク: ${mood?.makeupStyle ?? 'J-beautyらしい自然なメイク'}
-${trimmedNote ? `- 追加の人物イメージメモ: ${trimmedNote}` : ''}
+  const variationSection = buildPromptSection(
+    'バリエーション指示',
+    hasReferenceImage
+      ? [
+          '- 参照モデルの顔立ちを維持したまま、髪色・束感・アクセサリーでニュアンスの変化を付ける。',
+          '- 表情やポーズは参照に近い範囲で微調整し、別人に見える改変は禁止。',
+        ]
+      : [
+          '- 各生成は異なる人物で構わない。顔立ちや骨格、雰囲気、肌トーンを大胆に変えて多様性を出す。',
+          '- 髪色・質感・前髪・スタイリング・アクセサリー・背景を大きく入れ替え、比較しやすい幅広いバリエーションを提示する。',
+          '- ターゲット層に合う日本人モデルとしてのリアリティを維持する。',
+        ],
+  );
 
-- 一枚の画像には必ず1名のみを写し、分割コラージュや複数カットの合成は禁止
-- 構図: バストアップ、カメラ目線
-- カメラ: 85mmポートレートレンズ / F1.8 / 4:5縦構図 / 浅い被写界深度
-- 多様性: 生成ごとに髪色・アクセサリー・ポーズを微妙に変えてランダムさを出してよい
+  const shootSection = buildPromptSection('撮影ディレクション', [
+    '構図: バストアップでモデルの表情と髪全体が分かるアングル。',
+    'カメラ: 85mmポートレートレンズ / F1.8前後 / 4:5縦構図。',
+    '照明: 柔らかなキーライトと補助光で肌と髪の質感を強調する。',
+    '背景: サロンやスタジオのリアルな環境。ムードに合わせて背景色や小物を変えて良い。',
+  ]);
 
-【ランダムバリエーション（この生成特有）】
-${randomVariations}
+  const creativeSection = buildPromptSection('クリエイティブヒント', [randomVariations]);
 
-【ユニーク指示タグ】
-- Variation-Key: ${uniqueSeed}
-- Mood-ID: ${mood?.id ?? 'none'}
+  const qualitySection = buildPromptSection('品質・出力', [
+    '人物は1名のみ。分割レイアウトやマルチカットの合成は禁止。',
+    'フォトリアリズムを維持し、アニメ風やAIアート風表現は禁止。',
+    '肌テクスチャは自然に保ち、過剰なレタッチは禁止。',
+    'テキスト・ロゴ・透かしを含めない。',
+    '出力形式: PNGのみ。',
+  ]);
 
-【仕上がり要件】
-- 肌テクスチャは自然に保ち、過度なレタッチは禁止
-- 一枚の画像に複数人を配置したり、分割レイアウトやタイル状の構図を出さない
-- 文字やグラフィックは一切含めない
-- 出力形式はPNG画像のみ。テキストや説明文は返さない
+  const metaSection = buildPromptSection('生成メタ情報', [
+    `- Variation-Key: ${uniqueSeed}`,
+    `- Mood-ID: ${mood?.id ?? 'none'}`,
+    `- Model-Source: ${hasReferenceImage ? 'reference-image' : 'parametric-profile'}`,
+  ]);
 
-【参考ヒント（任意で採用可）】
-${moodHints}
-`.trim();
+  const moodSection = buildPromptSection('参考ヒント（任意）', [moodHints]);
+
+  const sections = [
+    intro,
+    referenceSection,
+    modelSection,
+    hairSection,
+    variationSection,
+    shootSection,
+    creativeSection,
+    qualitySection,
+    metaSection,
+    moodSection,
+  ].filter(Boolean);
+
+  return sections.join('\n\n').trim();
 }
 
 function buildStylePromptWithModel(
@@ -573,6 +654,10 @@ function buildStylePromptWithModel(
   const faceType = describeModelFace(model.face_type);
   const baseHairProfile = formatModelHairPreferences(model.hair_profile);
   const moodHints = compileMoodHints(mood);
+  const { description: randomVariations, signatureParts } = generateRandomVariations({
+    excludeCategories: ['expressions', 'poses', 'makeupVariations'],
+    profile: 'controlled',
+  });
   const uniqueSeed = createUniqueSeed('style-model', [
     model.id,
     model.gender,
@@ -587,6 +672,7 @@ function buildStylePromptWithModel(
     params.bangs ?? 'bangs-free',
     mood?.id ?? 'free',
     'face-lock',
+    ...signatureParts,
   ]);
 
   const intro = [
@@ -637,6 +723,7 @@ function buildStylePromptWithModel(
   ]);
 
   const moodSection = buildPromptSection('参考ヒント（任意）', [moodHints]);
+  const creativeSection = buildPromptSection('調整ヒント', [randomVariations]);
 
   const sections = [
     intro,
@@ -646,6 +733,7 @@ function buildStylePromptWithModel(
     adjustmentSection,
     qualitySection,
     metaSection,
+    creativeSection,
     moodSection,
   ].filter(Boolean);
 
@@ -654,7 +742,9 @@ function buildStylePromptWithModel(
 
 function buildBatchStylePrompt(mood: StyleMoodHint | null): string {
   const moodHints = compileMoodHints(mood);
-  const { description: randomVariations, signatureParts } = generateRandomVariations();
+  const { description: randomVariations, signatureParts } = generateRandomVariations({
+    profile: 'high',
+  });
   const uniqueSeed = createUniqueSeed('style-batch', [mood?.id ?? 'free', ...signatureParts]);
 
   return `

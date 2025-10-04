@@ -1,10 +1,18 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+
 import { Button } from '../../../shared/ui/Button';
 import { Card } from '../../../shared/ui/Card';
-import { mockAssets, mockVariations, mockReviews } from '../mock-data';
+import {
+  useAsset,
+  useCreateReviewMutation,
+  useLatestGenerationJob,
+  useReviews,
+  useVariationStatusMutation,
+  useVariations,
+} from '../hooks';
 import { useGenerationStore } from '../store/generation';
-import type { VariationStatus, Review } from '../types';
+import type { VariationStatus } from '../types';
 
 export function GenerationGallery() {
   const { assetId } = useParams<{ assetId: string }>();
@@ -15,77 +23,97 @@ export function GenerationGallery() {
     currentJob,
     variations: storeVariations,
     setVariations,
+    setCurrentJob,
   } = useGenerationStore();
 
-  const asset = currentAsset || mockAssets.find((a) => a.id === assetId);
-  // ストアのバリエーションがあればそれを使用、なければmockを使用
-  const variations = storeVariations.length > 0 ? storeVariations : mockVariations;
+  const { data: assetFromDb, isLoading: isAssetLoading } = useAsset(assetId);
+  const { data: latestJobData } = useLatestGenerationJob(assetId);
 
-  const isGenerating = currentJob?.status === 'processing';
+  useEffect(() => {
+    if (!currentJob && latestJobData) {
+      const { variations: _unused, ...jobWithoutVariations } = latestJobData;
+      setCurrentJob(jobWithoutVariations);
+      if (latestJobData.variations.length > 0 && storeVariations.length === 0) {
+        setVariations(latestJobData.variations);
+      }
+    }
+  }, [currentJob, latestJobData, setCurrentJob, setVariations, storeVariations.length]);
+
+  const job = currentJob ?? latestJobData ?? null;
+  const jobId = job?.id;
+
+  const { data: variationsFromQuery = [], isLoading: isVariationsLoading } = useVariations(jobId);
+
+  const variations = useMemo(() => {
+    if (storeVariations.length > 0) return storeVariations;
+    if (variationsFromQuery.length > 0) return variationsFromQuery;
+    if (latestJobData?.variations.length) return latestJobData.variations;
+    return [];
+  }, [storeVariations, variationsFromQuery, latestJobData]);
+
+  const variationIds = useMemo(() => variations.map((variation) => variation.id), [variations]);
+  const { data: reviews = [] } = useReviews(variationIds);
+  const createReviewMutation = useCreateReviewMutation(variationIds);
+  const variationStatusMutation = useVariationStatusMutation();
+
+  const asset = currentAsset ?? assetFromDb;
+  const isGenerating = job?.status === 'processing';
 
   const [selectedVariation, setSelectedVariation] = useState<string | null>(null);
   const [reviewComment, setReviewComment] = useState('');
-  const [reviews, setReviews] = useState<Review[]>(mockReviews);
 
-  if (!asset) {
+  if (isAssetLoading) {
     return (
-      <div className="p-6 text-center">
-        <p className="text-gray-600">画像が見つかりません</p>
+      <div className="p-6">
+        <Card className="p-6 text-center text-gray-500">読み込み中です...</Card>
       </div>
     );
   }
 
-  const selectedVar = variations.find((v) => v.id === selectedVariation);
+  if (!asset) {
+    return (
+      <div className="p-6 text-center text-gray-600">
+        <p>画像が見つかりません</p>
+      </div>
+    );
+  }
+
+  const selectedVar = variations.find((variation) => variation.id === selectedVariation);
   const existingReview = selectedVar
-    ? reviews.find((r) => r.variation_id === selectedVar.id)
+    ? reviews.find((review) => review.variation_id === selectedVar.id)
     : null;
 
-  const handleApprove = () => {
-    if (!selectedVariation) return;
+  const handleReviewAction = async (status: 'approved' | 'rejected') => {
+    if (!selectedVariation || !jobId) return;
 
-    // バリエーションのステータスを更新
-    const updatedVariations = variations.map((v) =>
-      v.id === selectedVariation ? { ...v, status: 'approved' as const } : v,
-    );
-    setVariations(updatedVariations);
+    try {
+      await variationStatusMutation.mutateAsync({
+        variationId: selectedVariation,
+        jobId,
+        projectId: asset.project_id,
+        status: status === 'approved' ? 'approved' : 'rejected',
+      });
 
-    // レビューを追加
-    const newReview: Review = {
-      id: `review-${Date.now()}`,
-      variation_id: selectedVariation,
-      reviewed_by: 'user-1',
-      status: 'approved',
-      ...(reviewComment ? { comment: reviewComment } : {}),
-      reviewed_at: new Date().toISOString(),
-    };
-    setReviews([...reviews, newReview]);
+      await createReviewMutation.mutateAsync({
+        variationId: selectedVariation,
+        status,
+        ...(reviewComment ? { comment: reviewComment } : {}),
+      });
 
-    setSelectedVariation(null);
-    setReviewComment('');
-  };
+      setVariations((prev) =>
+        prev.map((variation) =>
+          variation.id === selectedVariation
+            ? { ...variation, status: status as VariationStatus }
+            : variation,
+        ),
+      );
 
-  const handleReject = () => {
-    if (!selectedVariation) return;
-
-    // バリエーションのステータスを更新
-    const updatedVariations = variations.map((v) =>
-      v.id === selectedVariation ? { ...v, status: 'rejected' as const } : v,
-    );
-    setVariations(updatedVariations);
-
-    // レビューを追加
-    const newReview: Review = {
-      id: `review-${Date.now()}`,
-      variation_id: selectedVariation,
-      reviewed_by: 'user-1',
-      status: 'rejected',
-      ...(reviewComment ? { comment: reviewComment } : {}),
-      reviewed_at: new Date().toISOString(),
-    };
-    setReviews([...reviews, newReview]);
-
-    setSelectedVariation(null);
-    setReviewComment('');
+      setSelectedVariation(null);
+      setReviewComment('');
+    } catch (error) {
+      console.error('レビュー処理に失敗しました', error);
+      alert(error instanceof Error ? error.message : 'レビュー処理に失敗しました');
+    }
   };
 
   const getStatusLabel = (status: VariationStatus) => {
@@ -108,11 +136,10 @@ export function GenerationGallery() {
     return colors[status];
   };
 
-  const approvedCount = variations.filter((v) => v.status === 'approved').length;
+  const approvedCount = variations.filter((variation) => variation.status === 'approved').length;
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 p-6">
-      {/* ヘッダー */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">生成結果ギャラリー</h1>
@@ -128,7 +155,6 @@ export function GenerationGallery() {
         </div>
       </div>
 
-      {/* 統計 */}
       <Card className="p-6">
         <div className="flex items-center justify-between">
           <div>
@@ -151,12 +177,10 @@ export function GenerationGallery() {
       </Card>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        {/* ギャラリー */}
         <div className="lg:col-span-2">
           <Card className="p-6">
             <h2 className="mb-4 text-lg font-semibold">スタイルバリエーション</h2>
 
-            {/* 元画像 */}
             <div className="mb-6">
               <h3 className="mb-3 text-sm font-medium text-gray-600">元画像</h3>
               <div className="aspect-[4/5] max-w-xs overflow-hidden rounded-lg border-2 border-gray-200 bg-gray-100">
@@ -172,12 +196,12 @@ export function GenerationGallery() {
               生成されたスタイル
               {isGenerating && (
                 <span className="ml-2 text-blue-600">
-                  ({variations.length}/{currentJob?.variation_count || 4} 生成中...)
+                  ({variations.length}/{job?.variation_count ?? 4} 生成中...)
                 </span>
               )}
             </h3>
 
-            {isGenerating && variations.length === 0 && (
+            {(isGenerating || isVariationsLoading) && variations.length === 0 && (
               <div className="mb-4 rounded-lg bg-blue-50 p-4">
                 <div className="flex items-center gap-3">
                   <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
@@ -199,40 +223,33 @@ export function GenerationGallery() {
                     className={`group cursor-pointer overflow-hidden rounded-lg border-2 transition-all ${
                       isSelected
                         ? 'border-blue-600 shadow-lg'
-                        : 'border-gray-200 hover:border-gray-300 hover:shadow'
+                        : 'border-gray-200 hover:border-gray-300'
                     }`}
-                    onClick={() => setSelectedVariation(variation.id)}
+                    onClick={() => setSelectedVariation(isSelected ? null : variation.id)}
                   >
-                    <div className="relative aspect-[4/5] overflow-hidden bg-gray-100">
+                    <div className="relative aspect-[4/5] bg-gray-100">
                       <img
                         src={variation.image_url}
                         alt={`Variation ${variation.variation_rank}`}
                         className="h-full w-full object-cover"
                       />
-                      <div className="absolute right-2 top-2">
-                        <span
-                          className={`rounded-full px-3 py-1 text-xs font-medium ${getStatusColor(variation.status)}`}
-                        >
-                          {getStatusLabel(variation.status)}
-                        </span>
-                      </div>
-                      {variation.status === 'approved' && (
-                        <div className="absolute left-2 top-2">
-                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-green-600 text-white">
-                            ✓
-                          </div>
-                        </div>
-                      )}
+                      <span
+                        className={`absolute left-2 top-2 rounded-full px-2 py-1 text-xs font-medium ${getStatusColor(variation.status)}`}
+                      >
+                        {getStatusLabel(variation.status)}
+                      </span>
                     </div>
-                    <div className="p-3">
-                      <p className="font-medium">案 #{variation.variation_rank}</p>
-                      {review && review.comment && (
-                        <p className="mt-1 text-sm text-gray-600">💬 {review.comment}</p>
-                      )}
-                      {variation.safety_flags && variation.safety_flags.length > 0 && (
-                        <p className="mt-1 text-xs text-yellow-600">
-                          ⚠️ {variation.safety_flags.join(', ')}
-                        </p>
+                    <div className="space-y-2 p-3 text-sm text-gray-600">
+                      <div className="flex items-center justify-between">
+                        <p className="font-medium">案 #{variation.variation_rank}</p>
+                        {review && (
+                          <span className="text-xs text-blue-600">
+                            {new Date(review.reviewed_at).toLocaleDateString('ja-JP')}
+                          </span>
+                        )}
+                      </div>
+                      {review?.comment && (
+                        <p className="line-clamp-2 text-xs">💬 {review.comment}</p>
                       )}
                     </div>
                   </div>
@@ -242,102 +259,50 @@ export function GenerationGallery() {
           </Card>
         </div>
 
-        {/* レビューパネル */}
-        <div className="lg:col-span-1">
-          <Card className="sticky top-6 p-6">
+        <div>
+          <Card className="sticky top-6 space-y-4 p-6">
+            <h2 className="text-lg font-semibold">レビュー</h2>
             {selectedVar ? (
               <div className="space-y-4">
                 <div>
-                  <h2 className="text-lg font-semibold">
-                    案 #{selectedVar.variation_rank} をレビュー
-                  </h2>
-                  <p className="mt-1 text-sm text-gray-600">
-                    現在のステータス:{' '}
-                    <span
-                      className={`font-medium ${
-                        selectedVar.status === 'approved'
-                          ? 'text-green-600'
-                          : selectedVar.status === 'rejected'
-                            ? 'text-red-600'
-                            : 'text-gray-600'
-                      }`}
-                    >
-                      {getStatusLabel(selectedVar.status)}
-                    </span>
-                  </p>
-                </div>
-
-                <div className="aspect-[4/5] overflow-hidden rounded-lg bg-gray-100">
+                  <p className="text-sm text-gray-600">案 #{selectedVar.variation_rank}</p>
                   <img
                     src={selectedVar.image_url}
                     alt="Selected variation"
-                    className="h-full w-full object-cover"
+                    className="mt-2 w-full rounded-lg border"
                   />
                 </div>
-
+                <textarea
+                  className="h-24 w-full rounded-md border border-gray-300 p-2 text-sm focus:border-blue-500 focus:outline-none"
+                  placeholder="レビューコメントを入力してください"
+                  value={reviewComment}
+                  onChange={(e) => setReviewComment(e.target.value)}
+                />
                 {existingReview && (
-                  <div className="rounded-lg bg-gray-50 p-3">
-                    <p className="text-sm font-medium">既存のレビュー</p>
-                    <p className="mt-1 text-sm text-gray-600">{existingReview.comment}</p>
-                    <p className="mt-2 text-xs text-gray-500">
-                      {new Date(existingReview.reviewed_at).toLocaleString('ja-JP')}
-                    </p>
-                  </div>
+                  <p className="rounded bg-gray-100 p-2 text-xs text-gray-600">
+                    既存レビュー: {existingReview.status === 'approved' ? '承認済み' : '却下'} /{' '}
+                    {existingReview.comment ?? 'コメントなし'}
+                  </p>
                 )}
-
-                <div>
-                  <label className="mb-2 block text-sm font-medium">コメント（オプション）</label>
-                  <textarea
-                    className="w-full rounded-lg border border-gray-300 p-3 focus:border-blue-500 focus:outline-none"
-                    rows={3}
-                    placeholder="このスタイルについてのコメント..."
-                    value={reviewComment}
-                    onChange={(e) => setReviewComment(e.target.value)}
-                  />
-                </div>
-
                 <div className="flex gap-3">
-                  <Button
-                    onClick={handleApprove}
-                    className="flex-1"
-                    disabled={selectedVar.status === 'approved'}
-                  >
-                    ✓ 承認
+                  <Button className="flex-1" onClick={() => handleReviewAction('approved')}>
+                    承認する
                   </Button>
                   <Button
-                    onClick={handleReject}
                     variant="outline"
                     className="flex-1"
-                    disabled={selectedVar.status === 'rejected'}
+                    onClick={() => handleReviewAction('rejected')}
                   >
-                    ✗ 却下
+                    却下する
                   </Button>
                 </div>
-
-                {selectedVar.status === 'approved' && (
-                  <div className="rounded-lg bg-green-50 p-3 text-sm text-green-800">
-                    ✓ この案は承認済みです。エクスポート時に含まれます。
-                  </div>
-                )}
               </div>
             ) : (
-              <div className="py-12 text-center text-gray-500">
-                <p>左のギャラリーから</p>
-                <p>スタイル案を選択してください</p>
-              </div>
+              <p className="text-sm text-gray-600">レビューするスタイルを選択してください</p>
             )}
           </Card>
         </div>
       </div>
-
-      {variations.length === 0 && (
-        <div className="py-12 text-center text-gray-500">
-          <p className="mb-4">まだスタイルが生成されていません</p>
-          <Button onClick={() => navigate(`/salon/assets/${assetId}/style-parameters`)}>
-            スタイルを生成する
-          </Button>
-        </div>
-      )}
     </div>
   );
 }

@@ -60,6 +60,240 @@ export type Database = {
         };
         Relationships: [];
       };
+      salon_projects: {
+        Row: {
+          created_at: string;
+          id: string;
+          name: string;
+          owner_id: string;
+          salon_id: string;
+          status: 'active' | 'archived';
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          id?: string;
+          name: string;
+          owner_id: string;
+          salon_id: string;
+          status?: 'active' | 'archived';
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          name?: string;
+          owner_id?: string;
+          salon_id?: string;
+          status?: 'active' | 'archived';
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'salon_projects_owner_id_fkey';
+            columns: ['owner_id'];
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+            referencedSchema: 'auth';
+          },
+        ];
+      };
+      salon_assets: {
+        Row: {
+          description: string | null;
+          id: string;
+          metadata: Json;
+          original_url: string;
+          project_id: string;
+          status: 'uploaded' | 'ready_for_generation';
+          storage_path: string;
+          uploaded_at: string;
+          uploaded_by: string;
+        };
+        Insert: {
+          description?: string | null;
+          id?: string;
+          metadata?: Json;
+          original_url: string;
+          project_id: string;
+          status?: 'uploaded' | 'ready_for_generation';
+          storage_path: string;
+          uploaded_at?: string;
+          uploaded_by: string;
+        };
+        Update: {
+          description?: string | null;
+          id?: string;
+          metadata?: Json;
+          original_url?: string;
+          project_id?: string;
+          status?: 'uploaded' | 'ready_for_generation';
+          storage_path?: string;
+          uploaded_at?: string;
+          uploaded_by?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'salon_assets_project_id_fkey';
+            columns: ['project_id'];
+            referencedRelation: 'salon_projects';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'salon_assets_uploaded_by_fkey';
+            columns: ['uploaded_by'];
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+            referencedSchema: 'auth';
+          },
+        ];
+      };
+      salon_generation_jobs: {
+        Row: {
+          asset_id: string;
+          completed_at: string | null;
+          created_at: string;
+          created_by: string;
+          error_message: string | null;
+          id: string;
+          parameters: Json;
+          project_id: string;
+          response_id: string | null;
+          started_at: string | null;
+          status: 'pending' | 'processing' | 'completed' | 'failed';
+          variation_count: number;
+        };
+        Insert: {
+          asset_id: string;
+          completed_at?: string | null;
+          created_at?: string;
+          created_by: string;
+          error_message?: string | null;
+          id?: string;
+          parameters: Json;
+          project_id: string;
+          response_id?: string | null;
+          started_at?: string | null;
+          status?: 'pending' | 'processing' | 'completed' | 'failed';
+          variation_count?: number;
+        };
+        Update: {
+          asset_id?: string;
+          completed_at?: string | null;
+          created_at?: string;
+          created_by?: string;
+          error_message?: string | null;
+          id?: string;
+          parameters?: Json;
+          project_id?: string;
+          response_id?: string | null;
+          started_at?: string | null;
+          status?: 'pending' | 'processing' | 'completed' | 'failed';
+          variation_count?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'salon_generation_jobs_asset_id_fkey';
+            columns: ['asset_id'];
+            referencedRelation: 'salon_assets';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'salon_generation_jobs_created_by_fkey';
+            columns: ['created_by'];
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+            referencedSchema: 'auth';
+          },
+          {
+            foreignKeyName: 'salon_generation_jobs_project_id_fkey';
+            columns: ['project_id'];
+            referencedRelation: 'salon_projects';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      salon_variations: {
+        Row: {
+          created_at: string;
+          generation_job_id: string;
+          id: string;
+          image_url: string;
+          safety_flags: string[];
+          status: 'draft' | 'reviewing' | 'approved' | 'rejected';
+          storage_path: string;
+          variation_rank: number;
+        };
+        Insert: {
+          created_at?: string;
+          generation_job_id: string;
+          id?: string;
+          image_url: string;
+          safety_flags?: string[];
+          status?: 'draft' | 'reviewing' | 'approved' | 'rejected';
+          storage_path: string;
+          variation_rank: number;
+        };
+        Update: {
+          created_at?: string;
+          generation_job_id?: string;
+          id?: string;
+          image_url?: string;
+          safety_flags?: string[];
+          status?: 'draft' | 'reviewing' | 'approved' | 'rejected';
+          storage_path?: string;
+          variation_rank?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'salon_variations_generation_job_id_fkey';
+            columns: ['generation_job_id'];
+            referencedRelation: 'salon_generation_jobs';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      salon_reviews: {
+        Row: {
+          comment: string | null;
+          id: string;
+          reviewed_at: string;
+          reviewed_by: string;
+          status: 'approved' | 'rejected';
+          variation_id: string;
+        };
+        Insert: {
+          comment?: string | null;
+          id?: string;
+          reviewed_at?: string;
+          reviewed_by: string;
+          status: 'approved' | 'rejected';
+          variation_id: string;
+        };
+        Update: {
+          comment?: string | null;
+          id?: string;
+          reviewed_at?: string;
+          reviewed_by?: string;
+          status?: 'approved' | 'rejected';
+          variation_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'salon_reviews_reviewed_by_fkey';
+            columns: ['reviewed_by'];
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+            referencedSchema: 'auth';
+          },
+          {
+            foreignKeyName: 'salon_reviews_variation_id_fkey';
+            columns: ['variation_id'];
+            referencedRelation: 'salon_variations';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
     };
     Views: {
       [_ in never]: never;

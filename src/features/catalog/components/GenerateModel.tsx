@@ -476,12 +476,14 @@ export function GenerateModel() {
               </p>
               {referenceImagePreview ? (
                 <div className="space-y-2">
-                  <div className="relative w-32 overflow-hidden rounded border border-gray-200">
-                    <img
-                      src={referenceImagePreview}
-                      alt="Reference"
-                      className="h-40 w-32 object-cover"
-                    />
+                  <div className="relative w-32 overflow-hidden rounded border border-gray-200 bg-gray-100">
+                    <div className="aspect-[4/5] w-full">
+                      <img
+                        src={referenceImagePreview}
+                        alt="Reference"
+                        className="h-full w-full object-contain"
+                      />
+                    </div>
                   </div>
                   <Button variant="outline" onClick={clearReferenceImage} disabled={isGenerating}>
                     画像を削除
@@ -584,11 +586,13 @@ export function GenerateModel() {
                       }`}
                       onClick={() => toggleSelection(index)}
                     >
-                      <img
-                        src={model.url}
-                        alt={`Generated model ${index + 1}`}
-                        className="h-64 w-full object-cover"
-                      />
+                      <div className="aspect-[4/5] w-full overflow-hidden bg-gray-100">
+                        <img
+                          src={model.url}
+                          alt={`Generated model ${index + 1}`}
+                          className="h-full w-full object-contain"
+                        />
+                      </div>
                       {isSelected && <div className="absolute inset-0 bg-blue-500/20" />}
                       <div className="relative p-2 text-xs text-gray-600">
                         <div>年齢: {ageLabel}</div>

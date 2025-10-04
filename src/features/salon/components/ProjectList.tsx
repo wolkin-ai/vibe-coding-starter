@@ -1,27 +1,19 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card } from '../../../shared/ui/Card';
+
 import { Button } from '../../../shared/ui/Button';
-import { mockAssets, mockProjects } from '../mock-data';
-import type { Project } from '../types';
+import { Card } from '../../../shared/ui/Card';
+import { useSalonProjects } from '../hooks';
 
 export function ProjectList() {
   const navigate = useNavigate();
-  const [projects] = useState<Project[]>(mockProjects);
   const [filter, setFilter] = useState<'all' | 'active' | 'archived'>('active');
+  const { data: projects = [], isLoading, isError, error, refetch } = useSalonProjects();
 
-  const filteredProjects =
-    filter === 'all' ? projects : projects.filter((p) => p.status === filter);
-
-  const getProjectAssetCount = (projectId: string) => {
-    return mockAssets.filter((a) => a.project_id === projectId).length;
-  };
-
-  const getProjectApprovedCount = (_projectId: string) => {
-    // Note: Asset status doesn't include 'approved', this would need to check variations
-    // For now, return 0 as placeholder
-    return 0;
-  };
+  const filteredProjects = useMemo(
+    () => (filter === 'all' ? projects : projects.filter((project) => project.status === filter)),
+    [projects, filter],
+  );
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 p-6">
@@ -32,6 +24,17 @@ export function ProjectList() {
         </div>
         <Button onClick={() => navigate('/salon/projects/new')}>新規プロジェクト</Button>
       </div>
+
+      {isError && (
+        <Card className="border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          <div className="flex items-center justify-between">
+            <p>プロジェクトの読み込みに失敗しました: {error?.message}</p>
+            <Button variant="outline" size="sm" onClick={() => refetch()}>
+              再読み込み
+            </Button>
+          </div>
+        </Card>
+      )}
 
       <div className="flex gap-2">
         <Button variant={filter === 'all' ? 'primary' : 'outline'} onClick={() => setFilter('all')}>
@@ -51,12 +54,11 @@ export function ProjectList() {
         </Button>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {filteredProjects.map((project) => {
-          const assetCount = getProjectAssetCount(project.id);
-          const approvedCount = getProjectApprovedCount(project.id);
-
-          return (
+      {isLoading ? (
+        <Card className="p-6 text-center text-gray-500">読み込み中です...</Card>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {filteredProjects.map((project) => (
             <Card
               key={project.id}
               className="cursor-pointer transition-shadow hover:shadow-lg"
@@ -79,11 +81,17 @@ export function ProjectList() {
                 <div className="space-y-2 text-sm text-gray-600">
                   <div className="flex justify-between">
                     <span>総画像数</span>
-                    <span className="font-medium">{assetCount}枚</span>
+                    <span className="font-medium">{project.asset_count}枚</span>
                   </div>
                   <div className="flex justify-between">
                     <span>承認済み</span>
-                    <span className="font-medium text-green-600">{approvedCount}枚</span>
+                    <span className="font-medium text-green-600">
+                      {project.approved_variation_count}枚
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>生成済み</span>
+                    <span className="font-medium">{project.variation_count}案</span>
                   </div>
                   <div className="mt-4 text-xs text-gray-500">
                     更新日: {new Date(project.updated_at).toLocaleDateString('ja-JP')}
@@ -91,11 +99,11 @@ export function ProjectList() {
                 </div>
               </div>
             </Card>
-          );
-        })}
-      </div>
+          ))}
+        </div>
+      )}
 
-      {filteredProjects.length === 0 && (
+      {!isLoading && filteredProjects.length === 0 && (
         <div className="py-12 text-center text-gray-500">
           <p>プロジェクトがありません</p>
         </div>
