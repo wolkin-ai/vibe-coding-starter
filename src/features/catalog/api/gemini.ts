@@ -580,6 +580,12 @@ function buildStylePromptWithModel(
 画像を生成してください。
 日本の美容室カタログに掲載するフォトリアルなヘアスタイル提案を作成します。
 
+【参考画像について】
+添付された画像は、ヘアスタイルを適用するモデルの写真です。
+- このモデルの顔の特徴、表情、肌の質感を保持してください
+- 同じモデルとして認識できるレベルの一貫性を維持してください
+- モデルの外見は変えず、ヘアスタイルのみを変更してください
+
 【モデル情報】
 - 日本人${MODEL_GENDER_LABELS[model.gender]}モデル
 - 年齢層: ${modelAge}
@@ -955,10 +961,49 @@ export async function generateStyleWithModel(
 ): Promise<string[]> {
   const results: string[] = [];
 
+  // Convert model image to base64 reference image
+  let modelImageData: BaseImageInput | undefined;
+  try {
+    if (model.image_url.startsWith('data:')) {
+      // Already a data URL, extract base64 data
+      const base64Match = model.image_url.match(/^data:([^;]+);base64,(.+)$/);
+      if (base64Match && base64Match[2]) {
+        modelImageData = {
+          data: base64Match[2],
+          mimeType: base64Match[1] ?? 'image/png',
+        };
+      }
+    } else {
+      // Remote URL - fetch and convert to base64
+      const response = await fetch(model.image_url);
+      const blob = await response.blob();
+      const base64Data = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const dataUrl = reader.result as string;
+          const base64 = dataUrl.split(',')[1];
+          if (!base64) {
+            reject(new Error('Failed to extract base64 from image'));
+            return;
+          }
+          resolve(base64);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+      modelImageData = {
+        data: base64Data,
+        mimeType: blob.type || 'image/png',
+      };
+    }
+  } catch (error) {
+    console.warn('Failed to load model image as reference, generating without reference:', error);
+  }
+
   for (let i = 0; i < count; i++) {
     try {
       const prompt = buildStylePromptWithModel(mood, model, params);
-      const imageUrl = await generateImage(prompt, undefined, createRandomGenerationConfig());
+      const imageUrl = await generateImage(prompt, modelImageData, createRandomGenerationConfig());
       results.push(imageUrl);
       onStyleGenerated?.(imageUrl, i);
     } catch (error) {
