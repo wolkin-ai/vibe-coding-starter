@@ -151,6 +151,233 @@ function describeModelFace(face?: string | null): string {
   return MODEL_FACE_LABELS[face as ModelFaceType] || face;
 }
 
+/**
+ * Random variation elements to add diversity to generated images.
+ * 配列数を増やし、組み合わせの爆発的増加を狙う。
+ */
+const VARIATION_ELEMENTS = {
+  expressions: [
+    '柔らかな微笑み',
+    '自然な笑顔',
+    '穏やかな表情',
+    '知的な微笑み',
+    'リラックスした表情',
+    '優しい眼差し',
+    'いたずらっぽいウインク',
+    'クールで洗練された視線',
+    '穏やかなまなざし',
+    '爽やかな笑顔',
+    '落ち着いた微笑み',
+    '自信に満ちた眼差し',
+  ],
+  poses: [
+    '正面を向いた自然な姿勢',
+    'わずかに顔を傾けたポーズ',
+    '肩越しに振り向くポーズ',
+    '髪を耳にかける仕草',
+    '横顔が美しく見える角度',
+    '髪を軽く触れるポーズ',
+    '椅子に座って足を組むポーズ',
+    '立った状態で軽く腰に手を添えるポーズ',
+    '両手を前で優しく組むポーズ',
+    '顎に手を添えて考える仕草',
+    '背筋を伸ばした凛とした姿勢',
+    '片手で髪を後ろへ流す仕草',
+  ],
+  accessories: [
+    'シンプルなピアス',
+    '小ぶりなネックレス',
+    'ナチュラルなイヤリング',
+    'アクセサリーなし',
+    '細いチェーンのネックレス',
+    '小さなスタッドピアス',
+    '繊細なゴールドフープ',
+    '大ぶりなイヤーカフ',
+    '華奢なブレスレット',
+    'クラシックなパールアクセサリー',
+    'イヤーカフとリングのセット',
+    '透明なアクリルアクセサリー',
+  ],
+  lighting: [
+    'ソフトボックスによる均一な照明',
+    '窓からの自然光を活かした柔らかい光',
+    'リムライトで髪の輪郭を強調',
+    'サイドライトで立体感を演出',
+    'トップライトとフィルインの組み合わせ',
+    '逆光を利用したシルエット強調',
+    'ストリップライトで髪の艶を際立たせる',
+    'スポットライトで顔の中心を明るく照らす',
+    'レフ板を用いたハイキー照明',
+    'ゴールデンアワーの自然光',
+  ],
+  backgrounds: [
+    'ニュートラルグレーの背景',
+    'クリームホワイトの背景',
+    'ぼかしたサロンインテリア',
+    '柔らかいベージュトーンの背景',
+    '明るいナチュラルトーンの背景',
+    '都会的なガラスウォールの背景',
+    'カフェ風のウッドテクスチャ背景',
+    '淡いグラデーション背景',
+    '観葉植物をぼかしたグリーン背景',
+    '夜景のボケを使った背景',
+    '和モダンな障子モチーフ',
+    'サロンのシャンプーブースをぼかした背景',
+  ],
+  makeupVariations: [
+    'ナチュラルで透明感のあるメイク',
+    '血色感を重視したヘルシーメイク',
+    'マットな質感の大人メイク',
+    'ツヤ感のあるフレッシュメイク',
+    '上品で洗練されたメイク',
+    'アイラインを強調したモードメイク',
+    'ピーチカラーのチークを効かせたメイク',
+    'ラメを抑えたマットリップメイク',
+    '光沢感のあるガラススキン風メイク',
+    'ミニマルなノーメイク風スタイル',
+    '柔らかいピンクトーンのフェミニンメイク',
+    'オレンジブラウンのトレンドメイク',
+  ],
+  environments: [
+    '自然光が差し込むサロンの窓際',
+    '白壁とドライフラワーが飾られたスタジオ',
+    '都会の高層階ラウンジ',
+    'ナチュラルウッド調のセット',
+    'コンクリート打ちっぱなしのシンプルな空間',
+    'シックなバーラウンジ',
+    '海辺を感じさせるブルートーンの背景',
+    'ライトグリーンのファブリック背景',
+    'スモーキーなグラデーション背景',
+    'アートパネルが飾られたギャラリー風空間',
+    '春の花々をぼかした背景',
+    '暖色系の間接照明が映える空間',
+  ],
+  storytelling: [
+    '新しいサロンメニューの告知用に撮影',
+    '春のトレンドスタイル特集',
+    '都会で働く20代向けのスタイリッシュ提案',
+    'ウェディング前撮り向けの上品スタイル',
+    '就活ヘア特集の清楚スタイル',
+    '夏フェスを意識したエッジィな提案',
+    '成人式記念の華やかアレンジ',
+    '40代向けの若見え提案',
+    '韓国美容好き向けの最新スタイル',
+    '学生向けプチプラカラー紹介',
+    'ギャル誌コラボの撮影想定',
+    'ナチュラル志向のオーガニックヘア特集',
+  ],
+  cameraSettings: [
+    '50mm単焦点 / F1.4 / ISO200',
+    '85mm単焦点 / F2.0 / ISO320',
+    '70-200mmズーム / F2.8 / ISO400',
+    '35mm単焦点 / F1.8 / ISO160',
+    '105mmマクロ / F3.2 / ISO250',
+    '中判カメラの雰囲気を再現 / F2.4 / ISO100',
+    'シネライクカラー / シャッタースピード1/160',
+    'フラッシュあり / F8 / ISO100',
+    '連写で動きのある瞬間を捉える設定',
+    'トーンカーブを意識したコントラスト設定',
+    'HDRを抑えたフィルムライク設定',
+    'ナチュラルカラー重視のカラープロファイル',
+  ],
+};
+
+function randomPickMany<T>(array: T[], count: number): T[] {
+  const pool = [...array];
+  const picks: T[] = [];
+  const limit = Math.min(count, pool.length);
+  for (let i = 0; i < limit; i++) {
+    const index = Math.floor(Math.random() * pool.length);
+    const [value] = pool.splice(index, 1);
+    if (value !== undefined) {
+      picks.push(value);
+    }
+  }
+  return picks;
+}
+
+function simpleHash(input: string): string {
+  let hash = 0;
+  for (let i = 0; i < input.length; i++) {
+    const chr = input.charCodeAt(i);
+    hash = (hash << 5) - hash + chr;
+    hash |= 0; // Convert to 32bit integer
+  }
+  return Math.abs(hash).toString(36);
+}
+
+function createUniqueSeed(context: string, parts: string[]): string {
+  const uuid =
+    globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  const timestamp = Date.now().toString(36);
+  const blueprint = `${context}|${parts.join('|')}|${timestamp}|${uuid}`;
+  const digest = simpleHash(blueprint);
+  const randomSuffix = Math.random().toString(36).slice(2, 6).toUpperCase();
+  return `${context.toUpperCase()}-${timestamp}-${digest}-${randomSuffix}`;
+}
+
+function createRandomGenerationConfig(): GenerationConfig {
+  const temperature = 0.65 + Math.random() * 0.25; // 0.65〜0.90
+  const topP = 0.8 + Math.random() * 0.15; // 0.80〜0.95
+  // GeminiのimageモデルはtopKの上限が50付近のため、安全な範囲に限定する
+  const topKOptions = [24, 32, 40, 48];
+  const topK = randomPick(topKOptions);
+  return { temperature, topP, topK };
+}
+
+/**
+ * Randomly selects one element from an array
+ */
+function randomPick<T>(array: T[]): T {
+  const index = Math.floor(Math.random() * array.length);
+  return array[index] as T;
+}
+
+interface RandomVariationResult {
+  description: string;
+  signatureParts: string[];
+}
+
+function generateRandomVariations(): RandomVariationResult {
+  const expressions = randomPickMany(VARIATION_ELEMENTS.expressions, 2);
+  const poses = randomPickMany(VARIATION_ELEMENTS.poses, 2);
+  const accessories = randomPickMany(VARIATION_ELEMENTS.accessories, 2);
+  const lighting = randomPickMany(VARIATION_ELEMENTS.lighting, 1);
+  const backgrounds = randomPickMany(VARIATION_ELEMENTS.backgrounds, 2);
+  const makeup = randomPickMany(VARIATION_ELEMENTS.makeupVariations, 2);
+  const environments = randomPickMany(VARIATION_ELEMENTS.environments, 1);
+  const storytelling = randomPickMany(VARIATION_ELEMENTS.storytelling, 1);
+  const camera = randomPickMany(VARIATION_ELEMENTS.cameraSettings, 1);
+
+  const variations: string[] = [];
+  variations.push(`- 表情バリエーション: ${expressions.join(' / ')}`);
+  variations.push(`- ポーズ案: ${poses.join(' / ')}`);
+  variations.push(`- アクセサリー候補: ${accessories.join(' / ')}`);
+  variations.push(`- 照明プラン: ${lighting.join(' / ')}`);
+  variations.push(`- 背景・ロケーション: ${backgrounds.join(' / ')}`);
+  variations.push(`- メイク方向性: ${makeup.join(' / ')}`);
+  variations.push(`- 撮影環境: ${environments.join(' / ')}`);
+  variations.push(`- ストーリーフック: ${storytelling.join(' / ')}`);
+  variations.push(`- カメラ設定: ${camera.join(' / ')}`);
+
+  const signatureParts = [
+    ...expressions,
+    ...poses,
+    ...accessories,
+    ...lighting,
+    ...backgrounds,
+    ...makeup,
+    ...environments,
+    ...storytelling,
+    ...camera,
+  ];
+
+  return {
+    description: variations.join('\n'),
+    signatureParts,
+  };
+}
+
 function compileMoodHints(mood: StyleMoodHint | null): string {
   if (!mood) return '自由に新しい解釈を取り入れてください';
 
@@ -175,6 +402,14 @@ function buildModelPrompt(
   const ageLabel = describeModelAge(ageRange);
   const faceLabel = describeModelFace(faceType);
   const moodHints = compileMoodHints(mood);
+  const { description: randomVariations, signatureParts } = generateRandomVariations();
+  const uniqueSeed = createUniqueSeed('model', [
+    gender,
+    ageRange,
+    faceType,
+    mood?.id ?? 'free',
+    ...signatureParts,
+  ]);
 
   return `
 画像を生成してください。
@@ -192,15 +427,21 @@ function buildModelPrompt(
 - 髪型: 後工程で多様なスタイルに活用できるナチュラルなベースカット
 - メイク: ${mood?.makeupStyle ?? 'J-beautyらしい自然なメイク'}
 
-【撮影ディレクション】
-- 構図: バストアップ、カメラ目線、柔らかな微笑み
+- 一枚の画像には必ず1名のみを写し、分割コラージュや複数カットの合成は禁止
+- 構図: バストアップ、カメラ目線
 - カメラ: 85mmポートレートレンズ / F1.8 / 4:5縦構図 / 浅い被写界深度
-- ライティング: 大型ソフトボックスと窓光で均一な美肌ライティング
-- 背景: ${mood?.backgroundStyle ?? 'シンプルなスタジオ背景またはぼかした美容室インテリア'}
 - 多様性: 生成ごとに髪色・アクセサリー・ポーズを微妙に変えてランダムさを出してよい
+
+【ランダムバリエーション（この生成特有）】
+${randomVariations}
+
+【ユニーク指示タグ】
+- Variation-Key: ${uniqueSeed}
+- Mood-ID: ${mood?.id ?? 'none'}
 
 【仕上がり要件】
 - 肌テクスチャは自然に保ち、過度なレタッチは禁止
+- 一枚の画像に複数人を配置したり、分割レイアウトやタイル状の構図を出さない
 - 文字やグラフィックは一切含めない
 - 出力形式はPNG画像のみ。テキストや説明文は返さない
 
@@ -218,6 +459,17 @@ function buildStylePromptWithModel(
   const modelAge = describeModelAge(model.age_range as ModelAgeRange);
   const faceType = describeModelFace(model.face_type);
   const moodHints = compileMoodHints(mood);
+  const { description: randomVariations, signatureParts } = generateRandomVariations();
+  const uniqueSeed = createUniqueSeed('style-model', [
+    model.id,
+    model.gender,
+    modelAge,
+    faceType,
+    params.length,
+    params.color ?? 'unknown',
+    mood?.id ?? 'free',
+    ...signatureParts,
+  ]);
 
   return `
 画像を生成してください。
@@ -232,15 +484,22 @@ function buildStylePromptWithModel(
 【ヘアスタイル指示】
 ${hairDetails}
 
-【撮影ディレクション】
-- 構図: バストアップ、ヘア全体が映る角度で自然な笑顔
+- 一枚の画像には必ず1名のみを写し、分割コラージュや複数カットの合成は禁止
+- 構図: バストアップ、ヘア全体が映る角度
 - カメラ: 85mmポートレートレンズ / F2.0付近 / 4:5縦構図 / 浅い被写界深度
-- ライティング: ソフトボックス＋反射板で髪の質感を丁寧に描写
-- 背景: ${mood?.backgroundStyle ?? 'サロンのセット面やニュートラルな背景'}
 - 多様性: 生成ごとにスタイリング小物や髪色のニュアンスを変えてクリエイティブに
+
+【ランダムバリエーション（この生成特有）】
+${randomVariations}
+
+【ユニーク指示タグ】
+- Variation-Key: ${uniqueSeed}
+- Mood-ID: ${mood?.id ?? 'none'}
+- Model-Source: ${model.id}
 
 【仕上がり要件】
 - 髪色と質感をフォトリアルに再現し、エアブラシ過多は避ける
+- 一枚の画像に複数人を配置したり、分割レイアウトやタイル状の構図を出さない
 - テキストや説明文は一切含めない
 - 出力形式はPNG画像のみ
 
@@ -251,28 +510,36 @@ ${moodHints}
 
 function buildBatchStylePrompt(mood: StyleMoodHint | null): string {
   const moodHints = compileMoodHints(mood);
+  const { description: randomVariations, signatureParts } = generateRandomVariations();
+  const uniqueSeed = createUniqueSeed('style-batch', [mood?.id ?? 'free', ...signatureParts]);
 
   return `
 画像を生成してください。
-日本の美容室カタログに掲載する複数のフォトリアルなヘアスタイルを作成します。
+日本の美容室カタログに掲載するフォトリアルなヘアスタイルを作成します。
 
 【目的】
 - 日本人女性を中心とした美容室カタログ用のスタイルバリエーション
 
 【バリエーション指針】
-- 年代や雰囲気を生成ごとに変化させる
+- 年代や雰囲気を生成ごとに変化させる（1画像につき1名のみ）
 - 長さ・カラー・質感・前髪・スタイリングを幅広く構成し、トレンド感を演出
 - メイクは清潔感をキープしつつ、魅力的に
 
-【撮影ディレクション】
+- 一枚の画像には必ず1名のみを写し、分割コラージュや複数カットの合成は禁止
 - 構図: バストアップ中心、髪のディテールが明確に映る
 - カメラ: 85mmまたは50mmポートレートレンズ / 浅い被写界深度 / 4:5縦構図
-- ライティング: ソフトなディフューズ光＋リムライトで髪の艶を際立たせる
-- 背景: ${mood?.backgroundStyle ?? 'サロンやスタジオの柔らかな背景をぼかして使用'}
 - 多様性: スタイルごとにポーズ・表情・アクセサリーを変えて似通いを避ける
+
+【ランダムバリエーション（この生成特有）】
+${randomVariations}
+
+【ユニーク指示タグ】
+- Variation-Key: ${uniqueSeed}
+- Mood-ID: ${mood?.id ?? 'none'}
 
 【仕上がり要件】
 - 肌質は自然で、過度なレタッチやアニメ風表現は禁止
+- 一枚の画像に複数人を配置したり、分割レイアウトやタイル状の構図を出さない
 - テキスト・ロゴ・透かしは入れない
 - 出力形式はPNG画像のみ
 
@@ -284,6 +551,14 @@ ${moodHints}
 function buildStyleTransferPrompt(mood: StyleMoodHint | null, params: HairParameters): string {
   const hairDetails = formatHairParameters(params);
   const moodHints = compileMoodHints(mood);
+  const { description: randomVariations, signatureParts } = generateRandomVariations();
+  const uniqueSeed = createUniqueSeed('style-transfer', [
+    params.length,
+    params.texture ?? 'texture-free',
+    params.color ?? 'color-free',
+    mood?.id ?? 'free',
+    ...signatureParts,
+  ]);
 
   return `
 画像を生成してください。
@@ -297,12 +572,19 @@ ${hairDetails}
 
 【撮影ディレクション】
 - 用途: 日本の美容室カタログ掲載用
-- ライティング: 柔らかいソフトボックス照明で艶を強調
-- 背景: ${mood?.backgroundStyle ?? 'シンプルでサロンらしい背景をぼかして使用'}
 - 仕上がり: フォトリアル、肌や髪の質感を保持し、アニメ風表現は禁止
+- 一枚の画像には必ず1名のみを写し、分割コラージュや複数カットの合成は禁止
+
+【ランダムバリエーション（この生成特有）】
+${randomVariations}
+
+【ユニーク指示タグ】
+- Variation-Key: ${uniqueSeed}
+- Mood-ID: ${mood?.id ?? 'none'}
 
 【出力要件】
 - 文字や説明文は一切含めない
+- 一枚の画像に複数人を配置したり、分割レイアウトやタイル状の構図を出さない
 - 出力形式はPNG画像のみ
 
 【参考ヒント（任意で採用可）】
@@ -310,20 +592,78 @@ ${moodHints}
 `.trim();
 }
 
+const BASE64_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let result = '';
+  let i = 0;
+
+  while (i < bytes.length) {
+    const byte1 = bytes[i] ?? 0;
+    const byte2 = i + 1 < bytes.length ? bytes[i + 1] : undefined;
+    const byte3 = i + 2 < bytes.length ? bytes[i + 2] : undefined;
+    i += 3;
+
+    const first = byte1 >> 2;
+    const second = ((byte1 & 0x03) << 4) | ((byte2 ?? 0) >> 4);
+    const third = byte2 !== undefined ? ((byte2 & 0x0f) << 2) | ((byte3 ?? 0) >> 6) : 64;
+    const fourth = byte3 !== undefined ? byte3 & 0x3f : 64;
+
+    result += BASE64_ALPHABET[first];
+    result += BASE64_ALPHABET[second];
+    result += third === 64 ? '=' : BASE64_ALPHABET[third];
+    result += fourth === 64 ? '=' : BASE64_ALPHABET[fourth];
+  }
+
+  return result;
+}
+
+function encodeSvgToBase64(svg: string): string {
+  const encoder = typeof TextEncoder !== 'undefined' ? new TextEncoder() : null;
+  if (encoder) {
+    const bytes = encoder.encode(svg);
+
+    if (typeof window !== 'undefined' && typeof window.btoa === 'function') {
+      let binary = '';
+      bytes.forEach((byte) => {
+        binary += String.fromCharCode(byte);
+      });
+      return window.btoa(binary);
+    }
+
+    return bytesToBase64(bytes);
+  }
+
+  const btoaFn =
+    typeof window !== 'undefined' && typeof window.btoa === 'function'
+      ? window.btoa.bind(window)
+      : typeof btoa === 'function'
+        ? btoa
+        : null;
+
+  if (!btoaFn) {
+    throw new Error('Base64 encoding is not supported in this environment');
+  }
+
+  const asciiSafe = svg.replace(/[\u0100-\uFFFF]/g, '?');
+  return btoaFn(asciiSafe);
+}
+
 function createMockImageDataUrl(text: string, bgColor: string = '#E5E7EB'): string {
   // Create a simple SVG placeholder that always works (no network needed)
+  const sanitizedLabel = text.replace(/\s+/g, ' ').trim();
   const svg = `
     <svg width="400" height="500" xmlns="http://www.w3.org/2000/svg">
       <rect width="400" height="500" fill="${bgColor}"/>
       <text x="50%" y="50%" text-anchor="middle" font-family="sans-serif" font-size="16" fill="#6B7280">
-        ${text}
+        ${sanitizedLabel}
       </text>
       <text x="50%" y="60%" text-anchor="middle" font-family="sans-serif" font-size="12" fill="#9CA3AF">
         (モック画像)
       </text>
     </svg>
   `;
-  return `data:image/svg+xml;base64,${btoa(svg)}`;
+  return `data:image/svg+xml;base64,${encodeSvgToBase64(svg)}`;
 }
 
 async function generateImage(
@@ -429,7 +769,7 @@ export async function generateCutModel(
   onProgress?.(0);
   const prompt = buildModelPrompt(mood, gender, ageRange, faceType);
   onProgress?.(50);
-  const imageUrl = await generateImage(prompt);
+  const imageUrl = await generateImage(prompt, undefined, createRandomGenerationConfig());
   onProgress?.(100);
   return imageUrl;
 }
@@ -467,12 +807,12 @@ export async function generateStyleWithModel(
   count: number = 4,
   onStyleGenerated?: (imageUrl: string, index: number) => void,
 ): Promise<string[]> {
-  const prompt = buildStylePromptWithModel(mood, model, params);
   const results: string[] = [];
 
   for (let i = 0; i < count; i++) {
     try {
-      const imageUrl = await generateImage(prompt);
+      const prompt = buildStylePromptWithModel(mood, model, params);
+      const imageUrl = await generateImage(prompt, undefined, createRandomGenerationConfig());
       results.push(imageUrl);
       onStyleGenerated?.(imageUrl, i);
     } catch (error) {
@@ -491,12 +831,12 @@ export async function generateStylesBatch(
   count: number = 8,
   onStyleGenerated?: (imageUrl: string, index: number) => void,
 ): Promise<string[]> {
-  const prompt = buildBatchStylePrompt(mood);
   const results: string[] = [];
 
   for (let i = 0; i < count; i++) {
     try {
-      const imageUrl = await generateImage(prompt);
+      const prompt = buildBatchStylePrompt(mood);
+      const imageUrl = await generateImage(prompt, undefined, createRandomGenerationConfig());
       results.push(imageUrl);
       onStyleGenerated?.(imageUrl, i);
     } catch (error) {
@@ -517,16 +857,20 @@ export async function generateStyleTransfer(
   count: number = 4,
   onStyleGenerated?: (imageUrl: string, index: number) => void,
 ): Promise<string[]> {
-  const prompt = buildStyleTransferPrompt(mood, params);
   const base64Image = await fileToBase64(referenceImage);
   const results: string[] = [];
 
   for (let i = 0; i < count; i++) {
     try {
-      const imageUrl = await generateImage(prompt, {
-        data: base64Image,
-        mimeType: referenceImage.type || 'image/jpeg',
-      });
+      const prompt = buildStyleTransferPrompt(mood, params);
+      const imageUrl = await generateImage(
+        prompt,
+        {
+          data: base64Image,
+          mimeType: referenceImage.type || 'image/jpeg',
+        },
+        createRandomGenerationConfig(),
+      );
       results.push(imageUrl);
       onStyleGenerated?.(imageUrl, i);
     } catch (error) {
