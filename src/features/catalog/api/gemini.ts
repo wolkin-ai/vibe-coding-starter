@@ -1,17 +1,13 @@
-import { GoogleGenerativeAI, type Part } from '@google/generative-ai';
+import { GoogleGenAI } from '@google/genai';
 import type { CutModel, HairParameters, ModelGender, ModelAgeRange, ModelFaceType } from '../types';
 
 const API_KEY = import.meta.env.VITE_GOOGLE_API_KEY;
 
-// Note: Gemini cannot generate images. This is a placeholder implementation.
-// For actual image generation, use Google's Imagen API, DALL-E, or Stable Diffusion.
 if (!API_KEY) {
   console.warn('Google API Key is not set in environment variables');
 }
 
-const genAI = new GoogleGenerativeAI(API_KEY || '');
-// Note: This model name is invalid. Gemini models don't support image generation.
-// The code will fall back to mock/placeholder images.
+const genAI = new GoogleGenAI({ apiKey: API_KEY || '' });
 const IMAGE_MODEL = 'gemini-2.5-flash-image';
 
 export interface StyleMoodHint {
@@ -342,52 +338,31 @@ async function generateImage(
     throw new Error('Google API Key is not configured');
   }
 
-  const defaultConfig: Required<GenerationConfig> = {
-    temperature: config.temperature ?? 0.7,
-    topK: config.topK ?? 40,
-    topP: config.topP ?? 0.95,
-  };
-
-  const model = genAI.getGenerativeModel({
-    model: IMAGE_MODEL,
-  });
-
-  const parts: Part[] = [];
-
-  if (baseImage) {
-    parts.push({
-      inlineData: {
-        mimeType: baseImage.mimeType || 'image/jpeg',
-        data: baseImage.data,
-      },
-    });
-  }
-
-  parts.push({ text: prompt });
-
   try {
-    const result = await model.generateContent({
-      contents: [
-        {
-          role: 'user',
-          parts,
-        },
-      ],
-      generationConfig: {
-        temperature: defaultConfig.temperature,
-        topK: defaultConfig.topK,
-        topP: defaultConfig.topP,
+    const response = await genAI.models.generateContent({
+      model: IMAGE_MODEL,
+      contents: prompt,
+      config: {
+        responseModalities: ['Image'],
+        temperature: config.temperature ?? 0.7,
+        topK: config.topK ?? 40,
+        topP: config.topP ?? 0.95,
       },
     });
 
-    const response = result.response;
-    if (!response) {
-      throw new Error('Gemini API returned no response');
-    }
+    console.log('Full API response:', JSON.stringify(response, null, 2));
 
     const candidates = response.candidates ?? [];
+    console.log('Number of candidates:', candidates.length);
+
     for (const candidate of candidates) {
       const candidateParts = candidate.content?.parts ?? [];
+      console.log(
+        'Candidate parts:',
+        candidateParts.length,
+        JSON.stringify(candidateParts, null, 2),
+      );
+
       for (const part of candidateParts) {
         if (part?.inlineData?.data) {
           const mimeType = part.inlineData.mimeType || 'image/png';
@@ -399,7 +374,13 @@ async function generateImage(
       }
     }
 
-    const textResponse = candidates
+    interface ResponseCandidate {
+      content?: {
+        parts?: Array<{ text?: string }>;
+      };
+    }
+
+    const textResponse = (candidates as ResponseCandidate[])
       .flatMap((candidate) => candidate.content?.parts ?? [])
       .find((part) => Boolean(part?.text));
 
@@ -412,6 +393,11 @@ async function generateImage(
     throw new Error('Gemini API did not return image data');
   } catch (error) {
     console.error('Gemini API call failed:', error);
+    console.error('Error details:', JSON.stringify(error, null, 2));
+    if (error instanceof Error) {
+      console.error('Error message:', error.message);
+      console.error('Error stack:', error.stack);
+    }
     throw error;
   }
 }

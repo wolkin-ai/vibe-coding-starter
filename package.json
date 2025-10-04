@@ -18,6 +18,7 @@
     "db:status": "supabase projects list"
   },
   "dependencies": {
+    "@google/genai": "^1.22.0",
     "@google/generative-ai": "^0.24.1",
     "@hookform/resolvers": "^3.3.4",
     "@supabase/supabase-js": "^2.39.3",
