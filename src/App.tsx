@@ -27,9 +27,9 @@ function App() {
         <Route path="/todos" element={<TodosPage />} />
 
         {/* Catalog AI Routes */}
-        <Route path="/catalog/themes/:themeId/generate-model" element={<GenerateModel />} />
-        <Route path="/catalog/themes/:themeId/generate-style" element={<GenerateStyle />} />
-        <Route path="/catalog/themes/:themeId/catalog" element={<CatalogManagement />} />
+        <Route path="/catalog" element={<CatalogManagement />} />
+        <Route path="/catalog/generate-model" element={<GenerateModel />} />
+        <Route path="/catalog/generate-style" element={<GenerateStyle />} />
 
         {/* Salon Management Routes (Legacy - for reference) */}
         <Route path="/salon/projects" element={<ProjectList />} />

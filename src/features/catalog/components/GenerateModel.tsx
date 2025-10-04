@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '../../../shared/ui/Button';
 import { Card } from '../../../shared/ui/Card';
 import { useCatalogStore } from '../store/catalog';
 import { generateCutModels, type StyleMoodHint } from '../api/gemini';
-import type { ModelAgeRange, ModelFaceType, ModelGender } from '../types';
+import type { CutModel, ModelAgeRange, ModelFaceType, ModelGender } from '../types';
 
 type MoodPreset = StyleMoodHint & { description: string };
 
@@ -88,7 +88,6 @@ interface GenerationParams {
 }
 
 export function GenerateModel() {
-  const { themeId } = useParams<{ themeId: string }>();
   const navigate = useNavigate();
   const { addModel } = useCatalogStore();
 
@@ -142,9 +141,8 @@ export function GenerateModel() {
     const selected = generatedModels[selectedIndex];
     if (!selected) return;
 
-    const newModel = {
+    const newModel: CutModel = {
       id: `model-${Date.now()}`,
-      brand_theme_id: themeId,
       gender: selected.params.gender,
       age_range: selected.params.age_range,
       face_type: selected.params.face_type,
@@ -164,13 +162,13 @@ export function GenerateModel() {
     };
 
     addModel(newModel);
-    navigate(`/catalog/themes/${themeId}`);
+    navigate('/catalog');
   };
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 p-6">
       <div className="flex items-center gap-3">
-        <Button variant="outline" onClick={() => navigate(`/catalog/themes/${themeId}`)}>
+        <Button variant="outline" onClick={() => navigate('/catalog')}>
           ← 戻る
         </Button>
         <div>

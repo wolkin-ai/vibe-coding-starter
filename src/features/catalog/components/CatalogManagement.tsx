@@ -155,8 +155,22 @@ export function CatalogManagement() {
       </Card>
 
       {filteredStyles.length === 0 ? (
-        <Card className="p-12 text-center text-gray-400">
-          まだスタイルがありません。生成画面から新しいスタイルを作成してください。
+        <Card className="flex flex-col items-center justify-center gap-4 p-12 text-center text-gray-600">
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-blue-50 text-blue-500">
+            📸
+          </div>
+          <div className="space-y-1">
+            <p className="text-lg font-semibold text-gray-800">まだカタログがありません</p>
+            <p className="text-sm text-gray-500">
+              カットモデルやヘアスタイルを生成するとここに一覧が表示されます。
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <Button onClick={() => navigate('/catalog/generate-model')}>カットモデルを作成</Button>
+            <Button variant="outline" onClick={() => navigate('/catalog/generate-style')}>
+              ヘアスタイルを作成
+            </Button>
+          </div>
         </Card>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
