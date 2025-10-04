@@ -104,6 +104,8 @@ export function GenerateModel() {
     texture: 'slight',
   });
   const [customNote, setCustomNote] = useState('');
+  const [referenceImage, setReferenceImage] = useState<File | null>(null);
+  const [referenceImagePreview, setReferenceImagePreview] = useState<string | null>(null);
 
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedModels, setGeneratedModels] = useState<GeneratedModelEntry[]>([]);
@@ -142,6 +144,7 @@ export function GenerateModel() {
       const options = {
         hairPreferences: hairSnapshot,
         ...(trimmedNote ? { additionalNote: trimmedNote } : {}),
+        ...(referenceImage ? { referenceImage } : {}),
         onModelGenerated: (imageUrl: string) => {
           const baseEntry = {
             url: imageUrl,
@@ -222,6 +225,42 @@ export function GenerateModel() {
       }
       return next;
     });
+  };
+
+  const handleReferenceImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) {
+      setReferenceImage(null);
+      setReferenceImagePreview(null);
+      return;
+    }
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      alert('画像ファイルを選択してください');
+      return;
+    }
+
+    // Validate file size (max 10MB)
+    const maxSize = 10 * 1024 * 1024;
+    if (file.size > maxSize) {
+      alert('画像サイズは10MB以下にしてください');
+      return;
+    }
+
+    setReferenceImage(file);
+
+    // Create preview
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setReferenceImagePreview(event.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const clearReferenceImage = () => {
+    setReferenceImage(null);
+    setReferenceImagePreview(null);
   };
 
   return (
@@ -426,6 +465,41 @@ export function GenerateModel() {
                   </div>
                 </div>
               </div>
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-medium text-gray-700">
+                参考画像（オプション）
+              </label>
+              <p className="mb-3 text-xs text-gray-500">
+                モデルの外見の一貫性を保つために参考画像をアップロードできます。同じモデルとして認識できるレベルで生成されます。
+              </p>
+              {referenceImagePreview ? (
+                <div className="space-y-2">
+                  <div className="relative w-32 overflow-hidden rounded border border-gray-200">
+                    <img
+                      src={referenceImagePreview}
+                      alt="Reference"
+                      className="h-40 w-32 object-cover"
+                    />
+                  </div>
+                  <Button variant="outline" onClick={clearReferenceImage} disabled={isGenerating}>
+                    画像を削除
+                  </Button>
+                </div>
+              ) : (
+                <label className="flex h-32 cursor-pointer flex-col items-center justify-center rounded border-2 border-dashed border-gray-300 bg-gray-50 transition hover:border-blue-400 hover:bg-blue-50">
+                  <span className="text-sm text-gray-600">📷 画像をアップロード</span>
+                  <span className="mt-1 text-xs text-gray-400">JPG, PNG (最大10MB)</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleReferenceImageChange}
+                    disabled={isGenerating}
+                    className="hidden"
+                  />
+                </label>
+              )}
             </div>
 
             <div>

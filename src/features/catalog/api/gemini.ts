@@ -36,6 +36,7 @@ interface CutModelGenerationOptions {
   hairPreferences?: Partial<HairParameters>;
   onProgress?: (progress: number) => void;
   additionalNote?: string;
+  referenceImage?: File;
 }
 
 interface CutModelBatchOptions extends CutModelGenerationOptions {
@@ -465,6 +466,7 @@ function buildModelPrompt(
   faceType: ModelFaceType,
   hairPreferences?: Partial<HairParameters>,
   additionalNote?: string,
+  hasReferenceImage?: boolean,
 ): string {
   const genderLabel = MODEL_GENDER_LABELS[gender];
   const ageLabel = describeModelAge(ageRange);
@@ -497,9 +499,20 @@ function buildModelPrompt(
     ? `- 髪型: 指定のベース条件を反映\n${hairPreferenceDetails}`
     : '- 髪型: 後工程で多様なスタイルに活用できるナチュラルなベースカット';
 
+  const referenceImageInstruction = hasReferenceImage
+    ? `
+【参考画像について】
+添付された画像を参考にして、モデルの外見の一貫性を保ってください。
+- 顔の特徴、表情、雰囲気を参考にしてください
+- 同じモデルとして認識できるレベルの一貫性を目指してください
+- ただし、指定された髪型や年齢帯などの要件は必ず反映してください
+`
+    : '';
+
   return `
 画像を生成してください。
 日本の美容室カタログに掲載するフォトリアルなモデル写真を制作します。
+${referenceImageInstruction}
 
 【目的】
 - 日本人女性モデルの美容室カタログ撮影
@@ -862,8 +875,23 @@ export async function generateCutModel(
   faceType: ModelFaceType,
   options: CutModelGenerationOptions = {},
 ): Promise<string> {
-  const { hairPreferences, onProgress, additionalNote } = options;
+  const { hairPreferences, onProgress, additionalNote, referenceImage } = options;
   onProgress?.(0);
+
+  let referenceImageData: BaseImageInput | undefined;
+  if (referenceImage) {
+    try {
+      const base64Data = await fileToBase64(referenceImage);
+      referenceImageData = {
+        data: base64Data,
+        mimeType: referenceImage.type || 'image/jpeg',
+      };
+    } catch (error) {
+      console.error('Failed to process reference image:', error);
+      throw new Error('Failed to process reference image');
+    }
+  }
+
   const prompt = buildModelPrompt(
     mood,
     gender,
@@ -871,9 +899,10 @@ export async function generateCutModel(
     faceType,
     hairPreferences,
     additionalNote,
+    Boolean(referenceImageData),
   );
   onProgress?.(50);
-  const imageUrl = await generateImage(prompt, undefined, createRandomGenerationConfig());
+  const imageUrl = await generateImage(prompt, referenceImageData, createRandomGenerationConfig());
   onProgress?.(100);
   return imageUrl;
 }
@@ -887,13 +916,14 @@ export async function generateCutModels(
   options: CutModelBatchOptions = {},
 ): Promise<string[]> {
   const results: string[] = [];
-  const { hairPreferences, onModelGenerated, onProgress, additionalNote } = options;
+  const { hairPreferences, onModelGenerated, onProgress, additionalNote, referenceImage } = options;
 
   for (let i = 0; i < count; i++) {
     try {
       const imageUrl = await generateCutModel(mood, gender, ageRange, faceType, {
         ...(hairPreferences ? { hairPreferences } : {}),
         ...(additionalNote ? { additionalNote } : {}),
+        ...(referenceImage ? { referenceImage } : {}),
       });
       results.push(imageUrl);
       onModelGenerated?.(imageUrl, i);
