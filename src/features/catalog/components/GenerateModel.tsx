@@ -107,7 +107,7 @@ export function GenerateModel() {
 
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedModels, setGeneratedModels] = useState<GeneratedModelEntry[]>([]);
-  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const [selectedIndexes, setSelectedIndexes] = useState<Set<number>>(new Set());
 
   const moodForGeneration = null;
 
@@ -134,7 +134,7 @@ export function GenerateModel() {
   const handleGenerate = async () => {
     setIsGenerating(true);
     setGeneratedModels([]);
-    setSelectedIndex(null);
+    setSelectedIndexes(new Set());
 
     try {
       const hairSnapshot = { ...hairPreferences };
@@ -148,7 +148,8 @@ export function GenerateModel() {
             params: { ...params },
             hair: { ...hairSnapshot },
           };
-          const entry = trimmedNote ? { ...baseEntry, note: trimmedNote } : baseEntry;
+          const entry: GeneratedModelEntry =
+            trimmedNote.length > 0 ? { ...baseEntry, note: trimmedNote } : baseEntry;
           setGeneratedModels((prev) => [...prev, entry]);
         },
       };
@@ -170,37 +171,57 @@ export function GenerateModel() {
   };
 
   const handleSaveModel = () => {
-    if (selectedIndex === null) return;
-    const selected = generatedModels[selectedIndex];
-    if (!selected) return;
+    if (selectedIndexes.size === 0) return;
 
-    const hairProfile = { ...selected.hair };
+    const timestamp = Date.now();
+    let offset = 0;
 
-    const generationParams: Record<string, unknown> = {
-      hair_preferences: hairProfile,
-    };
-    if (selected.note) {
-      generationParams.custom_note = selected.note;
-    }
+    selectedIndexes.forEach((index) => {
+      const selected = generatedModels[index];
+      if (!selected) return;
 
-    const newModel: CutModel = {
-      id: `model-${Date.now()}`,
-      gender: selected.params.gender,
-      age_range: selected.params.age_range,
-      face_type: selected.params.face_type,
-      image_url: selected.url,
-      generation_prompt: '',
-      generation_params: generationParams,
-      synthid_metadata: null,
-      is_favorite: false,
-      tags: [],
-      created_at: new Date().toISOString(),
-      created_by: 'local-user',
-      hair_profile: hairProfile,
-    };
+      const hairProfile = { ...selected.hair };
 
-    addModel(newModel);
+      const generationParams: Record<string, unknown> = {
+        hair_preferences: hairProfile,
+      };
+      if (selected.note) {
+        generationParams.custom_note = selected.note;
+      }
+
+      const newModel: CutModel = {
+        id: `model-${timestamp}-${offset}`,
+        gender: selected.params.gender,
+        age_range: selected.params.age_range,
+        face_type: selected.params.face_type,
+        image_url: selected.url,
+        generation_prompt: '',
+        generation_params: generationParams,
+        synthid_metadata: null,
+        is_favorite: false,
+        tags: [],
+        created_at: new Date().toISOString(),
+        created_by: 'local-user',
+        hair_profile: hairProfile,
+      };
+
+      addModel(newModel);
+      offset += 1;
+    });
+
     navigate('/catalog');
+  };
+
+  const toggleSelection = (index: number) => {
+    setSelectedIndexes((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) {
+        next.delete(index);
+      } else {
+        next.add(index);
+      }
+      return next;
+    });
   };
 
   return (
@@ -477,22 +498,25 @@ export function GenerateModel() {
                     .filter(Boolean)
                     .join(' / ');
 
+                  const isSelected = selectedIndexes.has(index);
+
                   return (
                     <div
                       key={`${model.url}-${index}`}
-                      className={`overflow-hidden rounded border transition ${
-                        selectedIndex === index
+                      className={`relative overflow-hidden rounded border transition ${
+                        isSelected
                           ? 'border-blue-500 ring-2 ring-blue-200'
                           : 'hover:border-blue-400'
                       }`}
-                      onClick={() => setSelectedIndex(index)}
+                      onClick={() => toggleSelection(index)}
                     >
                       <img
                         src={model.url}
                         alt={`Generated model ${index + 1}`}
                         className="h-64 w-full object-cover"
                       />
-                      <div className="p-2 text-xs text-gray-600">
+                      {isSelected && <div className="absolute inset-0 bg-blue-500/20" />}
+                      <div className="relative p-2 text-xs text-gray-600">
                         <div>年齢: {ageLabel}</div>
                         {hairSummary && (
                           <div className="mt-1 text-[10px] text-gray-500">{hairSummary}</div>
@@ -509,7 +533,7 @@ export function GenerateModel() {
               <Button
                 className="h-12 w-full"
                 onClick={handleSaveModel}
-                disabled={selectedIndex === null}
+                disabled={selectedIndexes.size === 0}
               >
                 選択したモデルを保存
               </Button>
