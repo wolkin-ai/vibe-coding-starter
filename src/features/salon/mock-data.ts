@@ -68,6 +68,7 @@ export const mockStylePresets: StylePreset[] = [
     identity_shift: 'soft_change',
     makeup_style: 'natural',
     retouch_level: 'light',
+    hpb_category: 'FRONT',
     is_custom: false,
   },
   {
@@ -81,6 +82,7 @@ export const mockStylePresets: StylePreset[] = [
     identity_shift: 'distinct_new',
     makeup_style: 'glam',
     retouch_level: 'full',
+    hpb_category: 'SIDE',
     is_custom: false,
   },
   {
@@ -94,6 +96,7 @@ export const mockStylePresets: StylePreset[] = [
     identity_shift: 'distinct_new',
     makeup_style: 'glam',
     retouch_level: 'light',
+    hpb_category: 'ARRANGE',
     is_custom: false,
   },
   {
@@ -107,6 +110,7 @@ export const mockStylePresets: StylePreset[] = [
     identity_shift: 'keep_similar',
     makeup_style: 'bare',
     retouch_level: 'none',
+    hpb_category: 'BACK',
     is_custom: false,
   },
 ];

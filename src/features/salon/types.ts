@@ -36,6 +36,7 @@ export interface StylePreset {
   identity_shift?: IdentityShift;
   makeup_style?: MakeupStyle;
   retouch_level?: RetouchLevel;
+  hpb_category?: HpbStyleCategory;
   is_custom: boolean;
 }
 
@@ -49,11 +50,13 @@ export interface StyleParameters {
   identity_shift?: IdentityShift;
   makeup_style?: MakeupStyle;
   retouch_level?: RetouchLevel;
+  hpb_category?: HpbStyleCategory;
 }
 
 export type IdentityShift = 'keep_similar' | 'soft_change' | 'distinct_new';
 export type MakeupStyle = 'bare' | 'natural' | 'glam';
 export type RetouchLevel = 'none' | 'light' | 'full';
+export type HpbStyleCategory = 'FRONT' | 'SIDE' | 'BACK' | 'ARRANGE' | 'BEFORE' | 'FASHION';
 
 export interface GenerationJob {
   id: string;

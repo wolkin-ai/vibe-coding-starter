@@ -349,6 +349,24 @@ const VARIATION_ELEMENTS = {
   ],
 };
 
+type VariationCategory = keyof typeof VARIATION_ELEMENTS;
+
+const VARIATION_OUTPUT_CONFIG: Record<VariationCategory, { label: string; count: number }> = {
+  expressions: { label: '表情バリエーション', count: 2 },
+  poses: { label: 'ポーズ案', count: 2 },
+  accessories: { label: 'アクセサリー候補', count: 2 },
+  lighting: { label: '照明プラン', count: 1 },
+  backgrounds: { label: '背景・ロケーション', count: 2 },
+  makeupVariations: { label: 'メイク方向性', count: 2 },
+  environments: { label: '撮影環境', count: 1 },
+  storytelling: { label: 'ストーリーフック', count: 1 },
+  cameraSettings: { label: 'カメラ設定', count: 1 },
+};
+
+interface RandomVariationOptions {
+  excludeCategories?: VariationCategory[];
+}
+
 function randomPickMany<T>(array: T[], count: number): T[] {
   const pool = [...array];
   const picks: T[] = [];
@@ -405,39 +423,26 @@ interface RandomVariationResult {
   signatureParts: string[];
 }
 
-function generateRandomVariations(): RandomVariationResult {
-  const expressions = randomPickMany(VARIATION_ELEMENTS.expressions, 2);
-  const poses = randomPickMany(VARIATION_ELEMENTS.poses, 2);
-  const accessories = randomPickMany(VARIATION_ELEMENTS.accessories, 2);
-  const lighting = randomPickMany(VARIATION_ELEMENTS.lighting, 1);
-  const backgrounds = randomPickMany(VARIATION_ELEMENTS.backgrounds, 2);
-  const makeup = randomPickMany(VARIATION_ELEMENTS.makeupVariations, 2);
-  const environments = randomPickMany(VARIATION_ELEMENTS.environments, 1);
-  const storytelling = randomPickMany(VARIATION_ELEMENTS.storytelling, 1);
-  const camera = randomPickMany(VARIATION_ELEMENTS.cameraSettings, 1);
-
+function generateRandomVariations(options: RandomVariationOptions = {}): RandomVariationResult {
+  const excludeSet = new Set<VariationCategory>(options.excludeCategories ?? []);
   const variations: string[] = [];
-  variations.push(`- 表情バリエーション: ${expressions.join(' / ')}`);
-  variations.push(`- ポーズ案: ${poses.join(' / ')}`);
-  variations.push(`- アクセサリー候補: ${accessories.join(' / ')}`);
-  variations.push(`- 照明プラン: ${lighting.join(' / ')}`);
-  variations.push(`- 背景・ロケーション: ${backgrounds.join(' / ')}`);
-  variations.push(`- メイク方向性: ${makeup.join(' / ')}`);
-  variations.push(`- 撮影環境: ${environments.join(' / ')}`);
-  variations.push(`- ストーリーフック: ${storytelling.join(' / ')}`);
-  variations.push(`- カメラ設定: ${camera.join(' / ')}`);
+  const signatureParts: string[] = [];
 
-  const signatureParts = [
-    ...expressions,
-    ...poses,
-    ...accessories,
-    ...lighting,
-    ...backgrounds,
-    ...makeup,
-    ...environments,
-    ...storytelling,
-    ...camera,
-  ];
+  (Object.keys(VARIATION_ELEMENTS) as VariationCategory[]).forEach((category) => {
+    if (excludeSet.has(category)) {
+      return;
+    }
+
+    const config = VARIATION_OUTPUT_CONFIG[category];
+    const elements = randomPickMany(VARIATION_ELEMENTS[category], config.count);
+
+    if (!elements.length) {
+      return;
+    }
+
+    variations.push(`- ${config.label}: ${elements.join(' / ')}`);
+    signatureParts.push(...elements);
+  });
 
   return {
     description: variations.join('\n'),
@@ -457,6 +462,14 @@ function compileMoodHints(mood: StyleMoodHint | null): string {
   if (mood.backgroundStyle) hints.push(`背景のヒント: ${mood.backgroundStyle}`);
   if (mood.targetAudience) hints.push(`想定ターゲット: ${mood.targetAudience}`);
   return hints.join('\n');
+}
+
+function buildPromptSection(title: string, lines: Array<string | undefined | null>): string {
+  const filtered = lines
+    .map((line) => (typeof line === 'string' ? line.trimEnd() : line))
+    .filter((line): line is string => Boolean(line && line.trim().length));
+  if (!filtered.length) return '';
+  return [`【${title}】`, ...filtered].join('\n');
 }
 
 function buildModelPrompt(
@@ -560,64 +573,83 @@ function buildStylePromptWithModel(
   const faceType = describeModelFace(model.face_type);
   const baseHairProfile = formatModelHairPreferences(model.hair_profile);
   const moodHints = compileMoodHints(mood);
-  const { description: randomVariations, signatureParts } = generateRandomVariations();
   const uniqueSeed = createUniqueSeed('style-model', [
     model.id,
     model.gender,
     modelAge,
     faceType,
-    params.length,
+    params.length ?? 'length-free',
     params.volume ?? 'volume-free',
     params.quality ?? 'quality-free',
     params.thickness ?? 'thickness-free',
-    params.color ?? 'unknown',
+    params.color ?? 'color-free',
     params.texture ?? 'texture-free',
+    params.bangs ?? 'bangs-free',
     mood?.id ?? 'free',
-    ...signatureParts,
+    'face-lock',
   ]);
 
-  return `
-画像を生成してください。
-日本の美容室カタログに掲載するフォトリアルなヘアスタイル提案を作成します。
+  const intro = [
+    '画像を生成してください。',
+    '日本の美容室カタログ向けに、参照モデルの顔を保持したまま髪型のみを変更したフォトリアル画像を作成します。',
+  ].join('\n');
 
-【参考画像について】
-添付された画像は、ヘアスタイルを適用するモデルの写真です。
-- このモデルの顔の特徴、表情、肌の質感を保持してください
-- 同じモデルとして認識できるレベルの一貫性を維持してください
-- モデルの外見は変えず、ヘアスタイルのみを変更してください
+  const referenceSection = buildPromptSection('参照モデル', [
+    '添付画像はベースモデルです。同一人物と認識できる顔立ちを厳密に維持してください。',
+    '顔保持ルール:',
+    '  - 輪郭・骨格・目・鼻・口・眉の形状と位置を変更しない',
+    '  - 表情・視線・肌色・肌質は参照画像と一致させ、レタッチは必要最小限',
+    '  - 頭部やカメラアングルの調整は±10度以内の微調整にとどめる',
+    `- モデル: 日本人${MODEL_GENDER_LABELS[model.gender]} / 年齢層: ${modelAge} / 顔型: ${faceType}`,
+    baseHairProfile ? `- 既存の髪状態:\n${baseHairProfile}` : undefined,
+    `- メイク: ${mood?.makeupStyle ?? '透明感のあるナチュラルメイク'}`,
+  ]);
 
-【モデル情報】
-- 日本人${MODEL_GENDER_LABELS[model.gender]}モデル
-- 年齢層: ${modelAge}
-- 顔型: ${faceType}
-${baseHairProfile ? `- 既存の髪状態:\n${baseHairProfile}` : ''}
-- メイク: ${mood?.makeupStyle ?? '透明感のあるナチュラルメイク'}
+  const hairSection = buildPromptSection('ヘアスタイル指示', [
+    hairDetails,
+    '髪の艶・立体感・毛束の流れを自然に表現し、頭頂部から毛先までディテールを保持する',
+  ]);
 
-【ヘアスタイル指示】
-${hairDetails}
+  const compositionSection = buildPromptSection('撮影・構図', [
+    '構図: バストアップで髪全体がフレームに収まる角度。カメラ高さは目線と同程度。',
+    'カメラ: 85mm相当 / F2.0前後 / 4:5縦構図。カメラ位置の大幅な変化は禁止。',
+    '照明: 柔らかなキーライトとリムライトで髪の質感を強調しつつ、顔の陰影を崩さない。',
+    '背景: ニュートラルトーンのサロンまたはスタジオ。極端な背景変更や屋外演出は禁止。',
+  ]);
 
-- 一枚の画像には必ず1名のみを写し、分割コラージュや複数カットの合成は禁止
-- 構図: バストアップ、ヘア全体が映る角度
-- カメラ: 85mmポートレートレンズ / F2.0付近 / 4:5縦構図 / 浅い被写界深度
-- 多様性: 生成ごとにスタイリング小物や髪色のニュアンスを変えてクリエイティブに
+  const adjustmentSection = buildPromptSection('許容される微調整', [
+    '髪の束感・毛流れ・前髪の分け目は自然な範囲で微調整して良い。',
+    'ヘアアクセサリーは小ぶりなピンや控えめなイヤリングのみ追加可。顔の印象を変えるアイテムは禁止。',
+  ]);
 
-【ランダムバリエーション（この生成特有）】
-${randomVariations}
+  const qualitySection = buildPromptSection('品質・出力', [
+    '人物は1名のみ。分割レイアウトやマルチカットの合成は禁止。',
+    'テキスト・ロゴ・装飾グラフィックは入れない。',
+    '肌と髪の質感をフォトリアルに保ち、AIアート風エフェクトは禁止。',
+    '参照画像と照合し、顔の特徴が一致していることを確認してから採用する。',
+    '出力形式: PNGのみ。',
+  ]);
 
-【ユニーク指示タグ】
-- Variation-Key: ${uniqueSeed}
-- Mood-ID: ${mood?.id ?? 'none'}
-- Model-Source: ${model.id}
+  const metaSection = buildPromptSection('生成メタ情報', [
+    `- Variation-Key: ${uniqueSeed}`,
+    `- Mood-ID: ${mood?.id ?? 'none'}`,
+    `- Model-Source: ${model.id}`,
+  ]);
 
-【仕上がり要件】
-- 髪色と質感をフォトリアルに再現し、エアブラシ過多は避ける
-- 一枚の画像に複数人を配置したり、分割レイアウトやタイル状の構図を出さない
-- テキストや説明文は一切含めない
-- 出力形式はPNG画像のみ
+  const moodSection = buildPromptSection('参考ヒント（任意）', [moodHints]);
 
-【参考ヒント（任意で採用可）】
-${moodHints}
-`.trim();
+  const sections = [
+    intro,
+    referenceSection,
+    hairSection,
+    compositionSection,
+    adjustmentSection,
+    qualitySection,
+    metaSection,
+    moodSection,
+  ].filter(Boolean);
+
+  return sections.join('\n\n').trim();
 }
 
 function buildBatchStylePrompt(mood: StyleMoodHint | null): string {
@@ -663,48 +695,78 @@ ${moodHints}
 function buildStyleTransferPrompt(mood: StyleMoodHint | null, params: HairParameters): string {
   const hairDetails = formatHairParameters(params);
   const moodHints = compileMoodHints(mood);
-  const { description: randomVariations, signatureParts } = generateRandomVariations();
   const uniqueSeed = createUniqueSeed('style-transfer', [
-    params.length,
+    params.length ?? 'length-free',
     params.volume ?? 'volume-free',
     params.quality ?? 'quality-free',
     params.thickness ?? 'thickness-free',
     params.texture ?? 'texture-free',
     params.color ?? 'color-free',
+    params.bangs ?? 'bangs-free',
     mood?.id ?? 'free',
-    ...signatureParts,
+    'face-lock',
   ]);
 
-  return `
-画像を生成してください。
-参考画像をベースに、日本の美容室カタログ向けのフォトリアルなスタイル転写を行います。
+  const intro = [
+    '画像を生成してください。',
+    'アップロードされた参照画像と同一人物として認識できる顔を維持しながら、ヘアスタイルのみを転写してください。',
+  ].join('\n');
 
-【スタイル転写の指示】
-- 入力画像のモデルの顔立ちと骨格を尊重しつつ、日本人女性らしい雰囲気に最適化
-- 以下のヘアディテールを忠実に表現
-${hairDetails}
-- ${mood?.colorPalette?.length ? `カラーパレット: ${mood.colorPalette.join(', ')}` : '色味は自然な肌トーンと髪色のバランスを保つ'}
+  const referenceSection = buildPromptSection('参照画像の取り扱い', [
+    '添付画像は必ずベースとして使用する。新規の顔や体を生成しない。',
+    '顔保持ルール:',
+    '  - 頭部の輪郭・骨格・目・鼻・口・眉の形状と配置を変更しない',
+    '  - 表情・視線・肌色・肌質・照明の当たり方を保つ',
+    '  - カメラアングルは参照と同等。構図変更は±5度以内の微調整まで。',
+  ]);
 
-【撮影ディレクション】
-- 用途: 日本の美容室カタログ掲載用
-- 仕上がり: フォトリアル、肌や髪の質感を保持し、アニメ風表現は禁止
-- 一枚の画像には必ず1名のみを写し、分割コラージュや複数カットの合成は禁止
+  const hairSection = buildPromptSection('転写するヘアディテール', [
+    hairDetails,
+    'ヘア転写の目的は髪色・長さ・質感・スタイリングの再現に限定し、顔の形状を変える補正は禁止。',
+    mood?.colorPalette?.length
+      ? `- カラーパレット: ${mood.colorPalette.join(', ')}`
+      : 'カラーは参照画像の肌トーンと調和する自然な仕上げにする',
+  ]);
 
-【ランダムバリエーション（この生成特有）】
-${randomVariations}
+  const compositionSection = buildPromptSection('撮影・背景の制約', [
+    '用途: 日本の美容室カタログ。',
+    '構図: バストアップ基準でヘア全体を収める。余白バランスは参照画像から大きく逸脱しない。',
+    '背景: 参照画像の背景を踏襲するか、トーンを揃えた近似背景に限定。極端な背景置換は禁止。',
+    '照明: 参照画像のライティング方向とコントラストを再現する。',
+  ]);
 
-【ユニーク指示タグ】
-- Variation-Key: ${uniqueSeed}
-- Mood-ID: ${mood?.id ?? 'none'}
+  const adjustmentSection = buildPromptSection('許容差分', [
+    '毛束の動き・ボリューム・前髪の分け目は自然な範囲で微調整可。',
+    'ヘアアクセサリーは参照に存在する場合のみ再現し、新規追加は禁止。',
+  ]);
 
-【出力要件】
-- 文字や説明文は一切含めない
-- 一枚の画像に複数人を配置したり、分割レイアウトやタイル状の構図を出さない
-- 出力形式はPNG画像のみ
+  const qualitySection = buildPromptSection('品質・検証', [
+    '人物は1名のみ。マルチカット合成は禁止。',
+    'テキスト・ロゴ・透かしを含めない。',
+    '肌・髪の質感をフォトリアルに保ち、イラスト風・AIアート風の処理は禁止。',
+    '生成結果が参照顔と一致しているか確認し、別人に見える場合は破棄する。',
+    '出力形式: PNG。',
+  ]);
 
-【参考ヒント（任意で採用可）】
-${moodHints}
-`.trim();
+  const metaSection = buildPromptSection('生成メタ情報', [
+    `- Variation-Key: ${uniqueSeed}`,
+    `- Mood-ID: ${mood?.id ?? 'none'}`,
+  ]);
+
+  const moodSection = buildPromptSection('参考ヒント（任意）', [moodHints]);
+
+  const sections = [
+    intro,
+    referenceSection,
+    hairSection,
+    compositionSection,
+    adjustmentSection,
+    qualitySection,
+    metaSection,
+    moodSection,
+  ].filter(Boolean);
+
+  return sections.join('\n\n').trim();
 }
 
 const BASE64_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
@@ -788,15 +850,31 @@ async function generateImage(
 ): Promise<string> {
   console.log('Attempting Gemini image generation...');
   console.log('Prompt:', prompt.substring(0, 100) + '...');
+  if (baseImage) {
+    console.log('Base image provided with mime type:', baseImage.mimeType);
+  }
 
   if (!API_KEY) {
     throw new Error('Google API Key is not configured');
   }
 
   try {
+    const userParts: Array<{ text?: string; inlineData?: { mimeType: string; data: string } }> = [];
+
+    if (baseImage) {
+      userParts.push({ inlineData: { mimeType: baseImage.mimeType, data: baseImage.data } });
+    }
+
+    userParts.push({ text: prompt });
+
     const response = await genAI.models.generateContent({
       model: IMAGE_MODEL,
-      contents: prompt,
+      contents: [
+        {
+          role: 'user',
+          parts: userParts,
+        },
+      ],
       config: {
         responseModalities: ['Image'],
         temperature: config.temperature ?? 0.7,

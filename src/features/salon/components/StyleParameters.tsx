@@ -53,6 +53,39 @@ const IMAGE_STYLE_OPTIONS = [
   'フェミニン',
 ];
 
+const HPB_CATEGORY_OPTIONS = [
+  {
+    value: 'FRONT' as const,
+    label: 'FRONT',
+    description: '正面ビュースタイル',
+  },
+  {
+    value: 'SIDE' as const,
+    label: 'SIDE',
+    description: '横顔・サイドビュー',
+  },
+  {
+    value: 'BACK' as const,
+    label: 'BACK',
+    description: 'バックショット',
+  },
+  {
+    value: 'ARRANGE' as const,
+    label: 'ARRANGE',
+    description: 'アレンジスタイル',
+  },
+  {
+    value: 'BEFORE' as const,
+    label: 'BEFORE',
+    description: '施術前のビフォー写真',
+  },
+  {
+    value: 'FASHION' as const,
+    label: 'FASHION',
+    description: 'ファッションスナップ',
+  },
+];
+
 const IDENTITY_SHIFT_OPTIONS = [
   {
     value: 'keep_similar' as const,
@@ -184,6 +217,12 @@ export function StyleParametersPage() {
           delete next.retouch_level;
         }
 
+        if (preset.hpb_category) {
+          next.hpb_category = preset.hpb_category;
+        } else {
+          delete next.hpb_category;
+        }
+
         return next;
       });
     }
@@ -262,6 +301,7 @@ export function StyleParametersPage() {
     parameters.identity_shift ||
     parameters.makeup_style ||
     parameters.retouch_level ||
+    parameters.hpb_category ||
     (parameters.custom_prompt && parameters.custom_prompt.trim().length > 0);
 
   return (
@@ -449,6 +489,46 @@ export function StyleParametersPage() {
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Hot Pepperカテゴリ */}
+          <div>
+            <label className="mb-2 block font-medium">Hot Pepper掲載カテゴリ</label>
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {HPB_CATEGORY_OPTIONS.map((option) => {
+                const isSelected = parameters.hpb_category === option.value;
+                return (
+                  <button
+                    key={option.value}
+                    onClick={() =>
+                      setParameters((prev) => ({
+                        ...prev,
+                        hpb_category: option.value,
+                      }))
+                    }
+                    className={`rounded-lg border-2 p-3 text-left text-sm transition-colors ${
+                      isSelected
+                        ? 'border-blue-600 bg-blue-50 text-blue-900'
+                        : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
+                    }`}
+                  >
+                    <p className="font-semibold">{option.label}</p>
+                    <p className="mt-1 text-xs text-gray-500">{option.description}</p>
+                  </button>
+                );
+              })}
+            </div>
+            <button
+              className="mt-3 text-sm text-blue-600 hover:underline"
+              onClick={() =>
+                setParameters((prev) => {
+                  const { hpb_category: _removed, ...rest } = prev;
+                  return rest as StyleParams;
+                })
+              }
+            >
+              設定しない
+            </button>
           </div>
 
           {/* メイクと補正 */}

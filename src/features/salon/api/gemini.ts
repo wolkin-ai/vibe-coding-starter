@@ -57,6 +57,20 @@ function buildPrompt(parameters: StyleParameters): string {
     parts.push(`- 全体イメージ: ${parameters.image_style}`);
   }
 
+  if (parameters.hpb_category) {
+    const hpbDescriptions: Record<NonNullable<StyleParameters['hpb_category']>, string> = {
+      FRONT: '正面からの仕上がりショット',
+      SIDE: 'サイドプロフィールの見せ方',
+      BACK: 'バックスタイルの印象重視',
+      ARRANGE: 'アレンジヘアの仕上がりを強調',
+      BEFORE: '施術前の状態を分かりやすく提示',
+      FASHION: 'ファッションとのトータルコーデを意識',
+    };
+    parts.push(
+      `- 掲載カテゴリ: ${parameters.hpb_category} (${hpbDescriptions[parameters.hpb_category]})`,
+    );
+  }
+
   if (parameters.identity_shift) {
     const identityDescriptions: Record<NonNullable<StyleParameters['identity_shift']>, string> = {
       keep_similar: '本人とわかる程度に整える',

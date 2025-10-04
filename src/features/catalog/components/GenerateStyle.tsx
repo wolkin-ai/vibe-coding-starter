@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../../../shared/ui/Button';
 import { Card } from '../../../shared/ui/Card';
@@ -153,6 +153,9 @@ export function GenerateStyle() {
   const [selectedPresetId, setSelectedPresetId] = useState('free');
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
   const [referenceImage, setReferenceImage] = useState<File | null>(null);
+  const [referencePreview, setReferencePreview] = useState<string | null>(null);
+  const [isReferenceDragActive, setIsReferenceDragActive] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [hairParams, setHairParams] = useState<HairParameters>({
     length: 'medium',
@@ -291,10 +294,70 @@ export function GenerateStyle() {
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    setReferenceImage(file ?? null);
+  };
+
+  const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsReferenceDragActive(false);
+    const file = event.dataTransfer.files?.[0];
     if (file) {
       setReferenceImage(file);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   };
+
+  const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!isReferenceDragActive) {
+      setIsReferenceDragActive(true);
+    }
+  };
+
+  const handleDragLeave = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+      setIsReferenceDragActive(false);
+    }
+  };
+
+  const openFileDialog = () => {
+    if (isGenerating) return;
+    fileInputRef.current?.click();
+  };
+
+  const clearReferenceImage = () => {
+    setReferenceImage(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (!Number.isFinite(bytes)) return '';
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  };
+
+  useEffect(() => {
+    if (!referenceImage) {
+      setReferencePreview(null);
+      return;
+    }
+
+    const objectUrl = URL.createObjectURL(referenceImage);
+    setReferencePreview(objectUrl);
+
+    return () => {
+      URL.revokeObjectURL(objectUrl);
+    };
+  }, [referenceImage]);
 
   const canGenerate =
     mode === 'with-model'
@@ -409,11 +472,13 @@ export function GenerateStyle() {
                         }`}
                         onClick={() => setSelectedModelId(model.id)}
                       >
-                        <img
-                          src={model.image_url}
-                          alt={model.id}
-                          className="h-40 w-full object-cover"
-                        />
+                        <div className="aspect-[4/5] w-full overflow-hidden bg-gray-100">
+                          <img
+                            src={model.image_url}
+                            alt={model.id}
+                            className="h-full w-full object-cover object-top"
+                          />
+                        </div>
                         <div className="space-y-1 p-3 text-xs text-gray-600">
                           <div>{model.tags?.slice(0, 3).join(' / ') || 'タグなし'}</div>
                           {hairSummary && (
@@ -591,10 +656,79 @@ export function GenerateStyle() {
           )}
 
           {mode === 'style-transfer' && (
-            <Card className="space-y-3 p-6">
+            <Card className="space-y-4 p-6">
               <h2 className="text-lg font-semibold">参考画像</h2>
-              <input type="file" accept="image/*" onChange={handleFileChange} />
-              {referenceImage && <p className="text-xs text-gray-600">{referenceImage.name}</p>}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleFileChange}
+              />
+              <div
+                role="button"
+                tabIndex={0}
+                aria-disabled={isGenerating}
+                onClick={openFileDialog}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    openFileDialog();
+                  }
+                }}
+                onDragEnter={handleDragOver}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                className={`flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-8 text-center transition ${
+                  referenceImage
+                    ? 'border-blue-500 bg-blue-50'
+                    : isReferenceDragActive
+                      ? 'border-blue-400 bg-blue-50/60'
+                      : 'border-gray-300 bg-gray-50 hover:border-blue-400'
+                } ${isGenerating ? 'pointer-events-none opacity-70' : 'cursor-pointer'}`}
+              >
+                <span className="text-sm font-medium text-gray-700">
+                  ここに画像をドラッグ＆ドロップするか、クリックして選択
+                </span>
+                <span className="mt-2 text-xs text-gray-500">
+                  PNG/JPEG推奨・最大10MB程度までを想定
+                </span>
+                {referenceImage && (
+                  <span className="mt-3 rounded-full bg-blue-100 px-3 py-1 text-xs text-blue-700">
+                    {referenceImage.name}
+                  </span>
+                )}
+              </div>
+
+              {referenceImage && (
+                <div className="flex flex-col gap-3 rounded-lg border border-gray-200 bg-white p-3 text-sm text-gray-700 shadow-sm">
+                  <div className="flex items-center gap-3">
+                    {referencePreview && (
+                      <img
+                        src={referencePreview}
+                        alt="参考画像プレビュー"
+                        className="h-20 w-20 flex-none rounded object-cover shadow"
+                      />
+                    )}
+                    <div className="flex-1 space-y-1">
+                      <p className="font-semibold text-gray-900">{referenceImage.name}</p>
+                      <p className="text-xs text-gray-500">{formatFileSize(referenceImage.size)}</p>
+                      <p className="text-xs text-gray-500">
+                        顔の特徴を維持したい画像を選択してください。
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={clearReferenceImage}
+                      disabled={isGenerating}
+                    >
+                      クリア
+                    </Button>
+                  </div>
+                </div>
+              )}
             </Card>
           )}
 
@@ -631,11 +765,13 @@ export function GenerateStyle() {
                       }`}
                       onClick={() => toggleSelection(index)}
                     >
-                      <img
-                        src={style.url}
-                        alt={`Generated style ${index + 1}`}
-                        className="h-64 w-full object-cover"
-                      />
+                      <div className="aspect-[4/5] w-full overflow-hidden bg-gray-100">
+                        <img
+                          src={style.url}
+                          alt={`Generated style ${index + 1}`}
+                          className="h-full w-full object-cover object-top"
+                        />
+                      </div>
                       <div className="p-2 text-xs text-gray-600">
                         {presetLabel}
                         {style.modelId ? ' / モデル指定' : ' / バッチ'}
