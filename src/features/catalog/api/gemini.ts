@@ -32,17 +32,29 @@ interface BaseImageInput {
   mimeType: string;
 }
 
+interface CutModelGenerationOptions {
+  hairPreferences?: Partial<HairParameters>;
+  onProgress?: (progress: number) => void;
+  additionalNote?: string;
+}
+
+interface CutModelBatchOptions extends CutModelGenerationOptions {
+  onModelGenerated?: (imageUrl: string, index: number) => void;
+}
+
 const MODEL_GENDER_LABELS: Record<ModelGender, string> = {
   female: '女性',
   male: '男性',
 };
 
 const MODEL_AGE_LABELS: Record<ModelAgeRange, string> = {
+  kids: 'キッズ',
   teen: '10代',
   '20s': '20代',
   '30s': '30代',
   '40s': '40代',
-  '50s': '50代以上',
+  '50s': '50代',
+  '60s': '60代以上',
 };
 
 const MODEL_FACE_LABELS: Record<ModelFaceType, string> = {
@@ -51,30 +63,42 @@ const MODEL_FACE_LABELS: Record<ModelFaceType, string> = {
   square: '四角型',
   long: '面長',
   heart: 'ハート型',
+  inverted_triangle: '逆三角型',
+  base: 'ベース型',
 };
 
 const HAIR_LENGTH_LABELS: Record<string, string> = {
-  very_short: 'ベリーショート',
-  short: 'ショート',
-  bob: 'ボブ',
-  medium: 'ミディアム',
-  semi_long: 'セミロング',
-  long: 'ロング',
-  super_long: 'スーパーロング',
+  very_short: 'ベリーショート（耳が見える長さ）',
+  short: 'ショート（耳下〜アゴ上）',
+  bob: 'ボブ（アゴライン）',
+  medium: 'ミディアム（肩ライン）',
+  semi_long: 'セミロング（鎖骨〜胸上）',
+  long: 'ロング（胸下〜腰）',
+  super_long: 'スーパーロング（腰下）',
 };
 
 const HAIR_VOLUME_LABELS: Record<string, string> = {
-  flat: 'タイトでフラット',
-  natural: '自然なボリューム',
-  voluminous: 'しっかりボリューム',
-  very_voluminous: '大きく膨らみのあるボリューム',
+  low: '少ない',
+  normal: '普通',
+  high: '多い',
 };
 
 const HAIR_TEXTURE_LABELS: Record<string, string> = {
-  straight: 'ストレート',
-  wavy: 'ゆるやかなウェーブ',
-  curly: '大きめのカール',
-  tight_curls: 'タイトなカール',
+  none: 'クセなし',
+  slight: 'クセ少し',
+  strong: 'クセ強め',
+};
+
+const HAIR_QUALITY_LABELS: Record<string, string> = {
+  soft: '柔らかい',
+  normal: '普通',
+  firm: '硬い',
+};
+
+const HAIR_THICKNESS_LABELS: Record<string, string> = {
+  thin: '細い',
+  normal: '普通',
+  thick: '太い',
 };
 
 const BANGS_LABELS: Record<string, string> = {
@@ -115,7 +139,17 @@ function describeValue(
 function formatHairParameters(params: HairParameters): string {
   const details: string[] = [];
 
-  details.push(`- 長さ: ${describeValue(params.length, HAIR_LENGTH_LABELS, params.length)}`);
+  const length = describeValue(params.length, HAIR_LENGTH_LABELS, params.length);
+  if (length) details.push(`- 長さ: ${length}`);
+
+  const volume = describeValue(params.volume, HAIR_VOLUME_LABELS, params.volume);
+  if (volume) details.push(`- 髪量: ${volume}`);
+
+  const quality = describeValue(params.quality, HAIR_QUALITY_LABELS, params.quality);
+  if (quality) details.push(`- 髪質: ${quality}`);
+
+  const thickness = describeValue(params.thickness, HAIR_THICKNESS_LABELS, params.thickness);
+  if (thickness) details.push(`- 太さ: ${thickness}`);
 
   const color = describeValue(params.color, HAIR_COLOR_LABELS, params.color);
   if (color) details.push(`- カラー: ${color}`);
@@ -123,10 +157,7 @@ function formatHairParameters(params: HairParameters): string {
   if (params.color_technique) details.push(`- カラーテクニック: ${params.color_technique}`);
 
   const texture = describeValue(params.texture, HAIR_TEXTURE_LABELS, params.texture);
-  if (texture) details.push(`- テクスチャ: ${texture}`);
-
-  const volume = describeValue(params.volume, HAIR_VOLUME_LABELS, params.volume);
-  if (volume) details.push(`- ボリューム: ${volume}`);
+  if (texture) details.push(`- クセ: ${texture}`);
 
   const bangs = describeValue(params.bangs, BANGS_LABELS, params.bangs);
   if (bangs) details.push(`- 前髪: ${bangs}`);
@@ -140,6 +171,41 @@ function formatHairParameters(params: HairParameters): string {
   }
 
   return details.join('\n');
+}
+
+function formatModelHairPreferences(
+  preferences?: Partial<HairParameters> | null,
+): string | undefined {
+  if (!preferences) return undefined;
+
+  const details: string[] = [];
+
+  const length = describeValue(preferences.length, HAIR_LENGTH_LABELS, preferences.length);
+  if (length) details.push(`  - 長さ: ${length}`);
+
+  const volume = describeValue(preferences.volume, HAIR_VOLUME_LABELS, preferences.volume);
+  if (volume) details.push(`  - 髪量: ${volume}`);
+
+  const quality = describeValue(preferences.quality, HAIR_QUALITY_LABELS, preferences.quality);
+  if (quality) details.push(`  - 髪質: ${quality}`);
+
+  const thickness = describeValue(
+    preferences.thickness,
+    HAIR_THICKNESS_LABELS,
+    preferences.thickness,
+  );
+  if (thickness) details.push(`  - 太さ: ${thickness}`);
+
+  const texture = describeValue(preferences.texture, HAIR_TEXTURE_LABELS, preferences.texture);
+  if (texture) details.push(`  - クセ: ${texture}`);
+
+  const bangs = describeValue(preferences.bangs, BANGS_LABELS, preferences.bangs);
+  if (bangs) details.push(`  - 前髪: ${bangs}`);
+
+  const color = describeValue(preferences.color, HAIR_COLOR_LABELS, preferences.color);
+  if (color) details.push(`  - ベースカラー: ${color}`);
+
+  return details.length ? details.join('\n') : undefined;
 }
 
 function describeModelAge(age: ModelAgeRange): string {
@@ -397,19 +463,39 @@ function buildModelPrompt(
   gender: ModelGender,
   ageRange: ModelAgeRange,
   faceType: ModelFaceType,
+  hairPreferences?: Partial<HairParameters>,
+  additionalNote?: string,
 ): string {
   const genderLabel = MODEL_GENDER_LABELS[gender];
   const ageLabel = describeModelAge(ageRange);
   const faceLabel = describeModelFace(faceType);
   const moodHints = compileMoodHints(mood);
   const { description: randomVariations, signatureParts } = generateRandomVariations();
+  const hairPreferenceDetails = formatModelHairPreferences(hairPreferences);
+  const trimmedNote = additionalNote?.trim();
+  const hairPreferenceSeedParts = hairPreferences
+    ? [
+        hairPreferences.length ?? 'length-free',
+        hairPreferences.volume ?? 'volume-free',
+        hairPreferences.quality ?? 'quality-free',
+        hairPreferences.thickness ?? 'thickness-free',
+        hairPreferences.texture ?? 'texture-free',
+        hairPreferences.bangs ?? 'bangs-free',
+        hairPreferences.color ?? 'color-free',
+      ]
+    : [];
   const uniqueSeed = createUniqueSeed('model', [
     gender,
     ageRange,
     faceType,
     mood?.id ?? 'free',
+    ...hairPreferenceSeedParts,
+    trimmedNote && trimmedNote.length ? trimmedNote : 'note-free',
     ...signatureParts,
   ]);
+  const hairProfileInstruction = hairPreferenceDetails
+    ? `- 髪型: 指定のベース条件を反映\n${hairPreferenceDetails}`
+    : '- 髪型: 後工程で多様なスタイルに活用できるナチュラルなベースカット';
 
   return `
 画像を生成してください。
@@ -424,8 +510,9 @@ function buildModelPrompt(
 - 性別: ${genderLabel}
 - 年齢層: ${ageLabel}
 - 顔型: ${faceLabel}
-- 髪型: 後工程で多様なスタイルに活用できるナチュラルなベースカット
+${hairProfileInstruction}
 - メイク: ${mood?.makeupStyle ?? 'J-beautyらしい自然なメイク'}
+${trimmedNote ? `- 追加の人物イメージメモ: ${trimmedNote}` : ''}
 
 - 一枚の画像には必ず1名のみを写し、分割コラージュや複数カットの合成は禁止
 - 構図: バストアップ、カメラ目線
@@ -458,6 +545,7 @@ function buildStylePromptWithModel(
   const hairDetails = formatHairParameters(params);
   const modelAge = describeModelAge(model.age_range as ModelAgeRange);
   const faceType = describeModelFace(model.face_type);
+  const baseHairProfile = formatModelHairPreferences(model.hair_profile);
   const moodHints = compileMoodHints(mood);
   const { description: randomVariations, signatureParts } = generateRandomVariations();
   const uniqueSeed = createUniqueSeed('style-model', [
@@ -466,7 +554,11 @@ function buildStylePromptWithModel(
     modelAge,
     faceType,
     params.length,
+    params.volume ?? 'volume-free',
+    params.quality ?? 'quality-free',
+    params.thickness ?? 'thickness-free',
     params.color ?? 'unknown',
+    params.texture ?? 'texture-free',
     mood?.id ?? 'free',
     ...signatureParts,
   ]);
@@ -479,6 +571,7 @@ function buildStylePromptWithModel(
 - 日本人${MODEL_GENDER_LABELS[model.gender]}モデル
 - 年齢層: ${modelAge}
 - 顔型: ${faceType}
+${baseHairProfile ? `- 既存の髪状態:\n${baseHairProfile}` : ''}
 - メイク: ${mood?.makeupStyle ?? '透明感のあるナチュラルメイク'}
 
 【ヘアスタイル指示】
@@ -554,6 +647,9 @@ function buildStyleTransferPrompt(mood: StyleMoodHint | null, params: HairParame
   const { description: randomVariations, signatureParts } = generateRandomVariations();
   const uniqueSeed = createUniqueSeed('style-transfer', [
     params.length,
+    params.volume ?? 'volume-free',
+    params.quality ?? 'quality-free',
+    params.thickness ?? 'thickness-free',
     params.texture ?? 'texture-free',
     params.color ?? 'color-free',
     mood?.id ?? 'free',
@@ -764,10 +860,18 @@ export async function generateCutModel(
   gender: ModelGender,
   ageRange: ModelAgeRange,
   faceType: ModelFaceType,
-  onProgress?: (progress: number) => void,
+  options: CutModelGenerationOptions = {},
 ): Promise<string> {
+  const { hairPreferences, onProgress, additionalNote } = options;
   onProgress?.(0);
-  const prompt = buildModelPrompt(mood, gender, ageRange, faceType);
+  const prompt = buildModelPrompt(
+    mood,
+    gender,
+    ageRange,
+    faceType,
+    hairPreferences,
+    additionalNote,
+  );
   onProgress?.(50);
   const imageUrl = await generateImage(prompt, undefined, createRandomGenerationConfig());
   onProgress?.(100);
@@ -780,20 +884,32 @@ export async function generateCutModels(
   ageRange: ModelAgeRange,
   faceType: ModelFaceType,
   count: number,
-  onModelGenerated?: (imageUrl: string, index: number) => void,
+  options: CutModelBatchOptions = {},
 ): Promise<string[]> {
   const results: string[] = [];
+  const { hairPreferences, onModelGenerated, onProgress, additionalNote } = options;
 
   for (let i = 0; i < count; i++) {
     try {
-      const imageUrl = await generateCutModel(mood, gender, ageRange, faceType);
+      const imageUrl = await generateCutModel(mood, gender, ageRange, faceType, {
+        ...(hairPreferences ? { hairPreferences } : {}),
+        ...(additionalNote ? { additionalNote } : {}),
+      });
       results.push(imageUrl);
       onModelGenerated?.(imageUrl, i);
+      if (onProgress) {
+        const progress = Math.round(((i + 1) / count) * 100);
+        onProgress(progress);
+      }
     } catch (error) {
       console.error(`Failed to generate model ${i + 1}:`, error);
       const mockUrl = createMockImageDataUrl(`モデル ${i + 1}`, '#F3F4F6');
       results.push(mockUrl);
       onModelGenerated?.(mockUrl, i);
+      if (onProgress) {
+        const progress = Math.round(((i + 1) / count) * 100);
+        onProgress(progress);
+      }
     }
   }
 

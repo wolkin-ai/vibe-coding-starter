@@ -14,6 +14,8 @@ import type {
   HairLength,
   HairVolume,
   HairTexture,
+  HairQuality,
+  HairThickness,
   BangsStyle,
   HairColorType,
   HairStyle,
@@ -72,11 +74,13 @@ const STYLE_PRESETS: MoodPreset[] = [
 const DEFAULT_PRESET: MoodPreset = STYLE_PRESETS[0]!;
 
 const LENGTH_OPTIONS: { value: HairLength; label: string }[] = [
+  { value: 'very_short', label: 'ベリーショート' },
   { value: 'short', label: 'ショート' },
   { value: 'bob', label: 'ボブ' },
   { value: 'medium', label: 'ミディアム' },
   { value: 'semi_long', label: 'セミロング' },
   { value: 'long', label: 'ロング' },
+  { value: 'super_long', label: 'スーパーロング' },
 ];
 
 const COLOR_OPTIONS: { value: HairColorType; label: string }[] = [
@@ -91,17 +95,27 @@ const COLOR_OPTIONS: { value: HairColorType; label: string }[] = [
 ];
 
 const TEXTURE_OPTIONS: { value: HairTexture; label: string }[] = [
-  { value: 'straight', label: 'ストレート' },
-  { value: 'wavy', label: 'ウェーブ' },
-  { value: 'curly', label: 'カール' },
-  { value: 'tight_curls', label: 'タイトカール' },
+  { value: 'none', label: 'クセなし' },
+  { value: 'slight', label: 'クセ少し' },
+  { value: 'strong', label: 'クセ強め' },
 ];
 
 const VOLUME_OPTIONS: { value: HairVolume; label: string }[] = [
-  { value: 'flat', label: 'タイト' },
-  { value: 'natural', label: 'ナチュラル' },
-  { value: 'voluminous', label: 'ボリューム' },
-  { value: 'very_voluminous', label: 'ハイボリューム' },
+  { value: 'low', label: '少ない' },
+  { value: 'normal', label: '普通' },
+  { value: 'high', label: '多い' },
+];
+
+const QUALITY_OPTIONS: { value: HairQuality; label: string }[] = [
+  { value: 'soft', label: '柔らかい' },
+  { value: 'normal', label: '普通' },
+  { value: 'firm', label: '硬い' },
+];
+
+const THICKNESS_OPTIONS: { value: HairThickness; label: string }[] = [
+  { value: 'thin', label: '細い' },
+  { value: 'normal', label: '普通' },
+  { value: 'thick', label: '太い' },
 ];
 
 const BANGS_OPTIONS: { value: BangsStyle; label: string }[] = [
@@ -143,8 +157,10 @@ export function GenerateStyle() {
   const [hairParams, setHairParams] = useState<HairParameters>({
     length: 'medium',
     color: 'brown',
-    texture: 'wavy',
-    volume: 'natural',
+    texture: 'slight',
+    volume: 'normal',
+    quality: 'normal',
+    thickness: 'normal',
     bangs: 'see_through',
   });
   const [batchCount, setBatchCount] = useState(6);
@@ -160,6 +176,18 @@ export function GenerateStyle() {
   }, [selectedPresetId]);
 
   const moodForGeneration = selectedPreset.id === 'free' ? null : selectedPreset;
+
+  const clearHairParam = (key: keyof HairParameters) => {
+    setHairParams((prev) => {
+      const { [key]: _removed, ...rest } = prev;
+      return rest as HairParameters;
+    });
+  };
+
+  const getLabel = (value: string | undefined, options: { value: string; label: string }[]) => {
+    if (!value) return undefined;
+    return options.find((option) => option.value === value)?.label;
+  };
 
   const handleGenerate = async () => {
     if (mode === 'with-model' && !selectedModelId) {
@@ -212,19 +240,24 @@ export function GenerateStyle() {
   const handleSaveStyles = () => {
     if (selectedIndexes.size === 0) return;
 
+    const paramsSnapshot: HairParameters = { ...hairParams };
+
     selectedIndexes.forEach((index) => {
       const style = generatedStyles[index];
       if (!style) return;
 
+      const snapshot: HairParameters = { ...paramsSnapshot };
+
       const newStyle: HairStyle = {
         id: `style-${Date.now()}-${index}`,
-        parameters: hairParams,
+        parameters: snapshot,
         image_url: style.url,
         status: 'draft',
         is_favorite: false,
         tags: moodForGeneration?.keywords ?? [],
         generation_params: {
           style_preset: selectedPresetId,
+          hair_parameters: snapshot,
         },
         generation_prompt: '',
         generation_job_id: `job-${Date.now()}`,
@@ -338,6 +371,36 @@ export function GenerateStyle() {
                 <div className="grid gap-3 sm:grid-cols-2">
                   {models.map((model) => {
                     const isActive = selectedModelId === model.id;
+                    const hairProfile = model.hair_profile ?? {};
+                    const lengthLabel = getLabel(
+                      hairProfile.length as string | undefined,
+                      LENGTH_OPTIONS,
+                    );
+                    const volumeLabel = getLabel(
+                      hairProfile.volume as string | undefined,
+                      VOLUME_OPTIONS,
+                    );
+                    const qualityLabel = getLabel(
+                      hairProfile.quality as string | undefined,
+                      QUALITY_OPTIONS,
+                    );
+                    const thicknessLabel = getLabel(
+                      hairProfile.thickness as string | undefined,
+                      THICKNESS_OPTIONS,
+                    );
+                    const textureLabel = getLabel(
+                      hairProfile.texture as string | undefined,
+                      TEXTURE_OPTIONS,
+                    );
+                    const hairSummary = [
+                      lengthLabel && `長さ: ${lengthLabel}`,
+                      volumeLabel && `髪量: ${volumeLabel}`,
+                      qualityLabel && `髪質: ${qualityLabel}`,
+                      thicknessLabel && `太さ: ${thicknessLabel}`,
+                      textureLabel && `クセ: ${textureLabel}`,
+                    ]
+                      .filter(Boolean)
+                      .join(' / ');
                     return (
                       <Card
                         key={model.id}
@@ -351,8 +414,11 @@ export function GenerateStyle() {
                           alt={model.id}
                           className="h-40 w-full object-cover"
                         />
-                        <div className="p-3 text-xs text-gray-600">
-                          {model.tags?.slice(0, 3).join(' / ') || 'タグなし'}
+                        <div className="space-y-1 p-3 text-xs text-gray-600">
+                          <div>{model.tags?.slice(0, 3).join(' / ') || 'タグなし'}</div>
+                          {hairSummary && (
+                            <div className="text-[10px] text-gray-500">{hairSummary}</div>
+                          )}
                         </div>
                       </Card>
                     );
@@ -398,7 +464,7 @@ export function GenerateStyle() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">質感</label>
+              <label className="text-sm font-medium text-gray-700">クセ</label>
               <div className="flex flex-wrap gap-2">
                 {TEXTURE_OPTIONS.map((option) => (
                   <Button
@@ -410,11 +476,18 @@ export function GenerateStyle() {
                     {option.label}
                   </Button>
                 ))}
+                <Button
+                  variant={hairParams.texture ? 'outline' : 'primary'}
+                  onClick={() => clearHairParam('texture')}
+                  disabled={isGenerating}
+                >
+                  設定しない
+                </Button>
               </div>
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">ボリューム</label>
+              <label className="text-sm font-medium text-gray-700">髪量</label>
               <div className="flex flex-wrap gap-2">
                 {VOLUME_OPTIONS.map((option) => (
                   <Button
@@ -426,6 +499,59 @@ export function GenerateStyle() {
                     {option.label}
                   </Button>
                 ))}
+                <Button
+                  variant={hairParams.volume ? 'outline' : 'primary'}
+                  onClick={() => clearHairParam('volume')}
+                  disabled={isGenerating}
+                >
+                  設定しない
+                </Button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">髪質</label>
+              <div className="flex flex-wrap gap-2">
+                {QUALITY_OPTIONS.map((option) => (
+                  <Button
+                    key={option.value}
+                    variant={hairParams.quality === option.value ? 'primary' : 'outline'}
+                    onClick={() => setHairParams((prev) => ({ ...prev, quality: option.value }))}
+                    disabled={isGenerating}
+                  >
+                    {option.label}
+                  </Button>
+                ))}
+                <Button
+                  variant={hairParams.quality ? 'outline' : 'primary'}
+                  onClick={() => clearHairParam('quality')}
+                  disabled={isGenerating}
+                >
+                  設定しない
+                </Button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">太さ</label>
+              <div className="flex flex-wrap gap-2">
+                {THICKNESS_OPTIONS.map((option) => (
+                  <Button
+                    key={option.value}
+                    variant={hairParams.thickness === option.value ? 'primary' : 'outline'}
+                    onClick={() => setHairParams((prev) => ({ ...prev, thickness: option.value }))}
+                    disabled={isGenerating}
+                  >
+                    {option.label}
+                  </Button>
+                ))}
+                <Button
+                  variant={hairParams.thickness ? 'outline' : 'primary'}
+                  onClick={() => clearHairParam('thickness')}
+                  disabled={isGenerating}
+                >
+                  設定しない
+                </Button>
               </div>
             </div>
 

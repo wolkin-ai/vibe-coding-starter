@@ -4,9 +4,16 @@
 
 export type ModelGender = 'female' | 'male';
 
-export type ModelAgeRange = 'teen' | '20s' | '30s' | '40s' | '50s';
+export type ModelAgeRange = 'kids' | 'teen' | '20s' | '30s' | '40s' | '50s' | '60s';
 
-export type ModelFaceType = 'oval' | 'round' | 'square' | 'long' | 'heart';
+export type ModelFaceType =
+  | 'oval'
+  | 'round'
+  | 'square'
+  | 'long'
+  | 'heart'
+  | 'inverted_triangle'
+  | 'base';
 
 export interface CutModel {
   id: string;
@@ -17,6 +24,7 @@ export interface CutModel {
   face_type?: ModelFaceType; // 顔型（卵型、丸型等）
   skin_tone?: string; // 肌トーン
   expression?: string; // 表情
+  hair_profile?: Partial<HairParameters>; // ベースヘア情報
 
   // 生成情報
   image_url: string;
@@ -47,9 +55,13 @@ export type HairLength =
   | 'long'
   | 'super_long';
 
-export type HairVolume = 'flat' | 'natural' | 'voluminous' | 'very_voluminous';
+export type HairVolume = 'low' | 'normal' | 'high';
 
-export type HairTexture = 'straight' | 'wavy' | 'curly' | 'tight_curls';
+export type HairTexture = 'none' | 'slight' | 'strong';
+
+export type HairQuality = 'soft' | 'normal' | 'firm';
+
+export type HairThickness = 'thin' | 'normal' | 'thick';
 
 export type BangsStyle =
   | 'none'
@@ -85,6 +97,8 @@ export interface HairParameters {
   styling?: string; // スタイリング方法
   styling_keywords?: string[];
   perm?: string;
+  quality?: HairQuality;
+  thickness?: HairThickness;
 }
 
 export type HairStyleStatus = 'draft' | 'reviewing' | 'approved' | 'archived';

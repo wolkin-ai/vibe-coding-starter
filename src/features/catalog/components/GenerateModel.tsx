@@ -1,74 +1,30 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../../../shared/ui/Button';
 import { Card } from '../../../shared/ui/Card';
 import { useCatalogStore } from '../store/catalog';
-import { generateCutModels, type StyleMoodHint } from '../api/gemini';
-import type { CutModel, ModelAgeRange, ModelFaceType, ModelGender } from '../types';
-
-type MoodPreset = StyleMoodHint & { description: string };
-
-const STYLE_PRESETS: MoodPreset[] = [
-  {
-    id: 'free',
-    label: 'おまかせ',
-    description: '特定の方向性を与えず、AIにバリエーション豊かな提案をさせます。',
-  },
-  {
-    id: 'gyaru',
-    label: 'ギャル風',
-    description: '明るく華やかでポップな雰囲気。',
-    keywords: ['明るい', '華やか', 'トレンド', 'ポップ'],
-    colorPalette: ['#FFB6C1', '#FFD700', '#87CEEB', '#FFA07A'],
-    makeupStyle: '大胆でカラーを効かせたメイク',
-    backgroundStyle: '都会的でポップなスタジオセット',
-    targetAudience: '10代〜20代',
-  },
-  {
-    id: 'mode',
-    label: 'モード系',
-    description: 'シャープで洗練されたモードな印象。',
-    keywords: ['モード', '洗練', 'シャープ'],
-    colorPalette: ['#111111', '#444444', '#CCCCCC'],
-    makeupStyle: 'コントラストを強調したクールメイク',
-    backgroundStyle: 'ミニマルなスタジオ背景',
-    targetAudience: '20代〜30代',
-  },
-  {
-    id: 'feminine',
-    label: 'ナチュラルフェミニン',
-    description: '柔らかく親しみやすい雰囲気。',
-    keywords: ['ナチュラル', '優しい', '透明感'],
-    colorPalette: ['#FFE4E1', '#F5DEB3', '#E6E6FA'],
-    makeupStyle: 'ツヤ感のあるナチュラルメイク',
-    backgroundStyle: '柔らかな自然光が入るスタジオ',
-    targetAudience: '20代〜40代',
-  },
-  {
-    id: 'korean',
-    label: 'K-ビューティ',
-    description: '韓国トレンドを意識した洗練スタイル。',
-    keywords: ['韓国風', 'トレンド', 'クリーン'],
-    colorPalette: ['#A0C4FF', '#FFD6E0', '#BBD0FF'],
-    makeupStyle: '透明感のあるグロウメイク',
-    backgroundStyle: '明るくシンプルな背景',
-    targetAudience: '10代〜30代',
-  },
-];
-
-const DEFAULT_PRESET: MoodPreset = STYLE_PRESETS[0]!;
-
-const GENDER_OPTIONS: { value: ModelGender; label: string }[] = [
-  { value: 'female', label: '女性' },
-  { value: 'male', label: '男性' },
-];
+import { generateCutModels } from '../api/gemini';
+import type {
+  CutModel,
+  HairParameters,
+  HairLength,
+  HairQuality,
+  HairTexture,
+  HairThickness,
+  HairVolume,
+  ModelAgeRange,
+  ModelFaceType,
+  ModelGender,
+} from '../types';
 
 const AGE_RANGE_OPTIONS: { value: ModelAgeRange; label: string }[] = [
+  { value: 'kids', label: 'キッズ' },
   { value: 'teen', label: '10代' },
   { value: '20s', label: '20代' },
   { value: '30s', label: '30代' },
   { value: '40s', label: '40代' },
-  { value: '50s', label: '50代以上' },
+  { value: '50s', label: '50代' },
+  { value: '60s', label: '60代以上' },
 ];
 
 const FACE_TYPE_OPTIONS: { value: ModelFaceType; label: string }[] = [
@@ -77,6 +33,42 @@ const FACE_TYPE_OPTIONS: { value: ModelFaceType; label: string }[] = [
   { value: 'square', label: '四角型' },
   { value: 'long', label: '面長' },
   { value: 'heart', label: 'ハート型' },
+  { value: 'inverted_triangle', label: '逆三角型' },
+  { value: 'base', label: 'ベース型' },
+];
+
+const HAIR_LENGTH_OPTIONS: { value: HairLength; label: string }[] = [
+  { value: 'very_short', label: 'ベリーショート' },
+  { value: 'short', label: 'ショート' },
+  { value: 'bob', label: 'ボブ' },
+  { value: 'medium', label: 'ミディアム' },
+  { value: 'semi_long', label: 'セミロング' },
+  { value: 'long', label: 'ロング' },
+  { value: 'super_long', label: 'スーパーロング' },
+];
+
+const HAIR_VOLUME_OPTIONS: { value: HairVolume; label: string }[] = [
+  { value: 'low', label: '少ない' },
+  { value: 'normal', label: '普通' },
+  { value: 'high', label: '多い' },
+];
+
+const HAIR_QUALITY_OPTIONS: { value: HairQuality; label: string }[] = [
+  { value: 'soft', label: '柔らかい' },
+  { value: 'normal', label: '普通' },
+  { value: 'firm', label: '硬い' },
+];
+
+const HAIR_THICKNESS_OPTIONS: { value: HairThickness; label: string }[] = [
+  { value: 'thin', label: '細い' },
+  { value: 'normal', label: '普通' },
+  { value: 'thick', label: '太い' },
+];
+
+const HAIR_TEXTURE_OPTIONS: { value: HairTexture; label: string }[] = [
+  { value: 'none', label: 'クセなし' },
+  { value: 'slight', label: 'クセ少し' },
+  { value: 'strong', label: 'クセ強め' },
 ];
 
 interface GenerationParams {
@@ -84,7 +76,13 @@ interface GenerationParams {
   age_range: ModelAgeRange;
   face_type: ModelFaceType;
   count: number;
-  style_preset: string;
+}
+
+interface GeneratedModelEntry {
+  url: string;
+  params: GenerationParams;
+  hair: Partial<HairParameters>;
+  note?: string;
 }
 
 export function GenerateModel() {
@@ -96,21 +94,42 @@ export function GenerateModel() {
     age_range: '20s',
     face_type: 'oval',
     count: 4,
-    style_preset: 'free',
   });
 
+  const [hairPreferences, setHairPreferences] = useState<Partial<HairParameters>>({
+    length: 'medium',
+    volume: 'normal',
+    quality: 'normal',
+    thickness: 'normal',
+    texture: 'slight',
+  });
+  const [customNote, setCustomNote] = useState('');
+
   const [isGenerating, setIsGenerating] = useState(false);
-  const [generatedModels, setGeneratedModels] = useState<
-    Array<{ url: string; params: GenerationParams }>
-  >([]);
+  const [generatedModels, setGeneratedModels] = useState<GeneratedModelEntry[]>([]);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
-  const selectedPreset = useMemo<MoodPreset>(() => {
-    const found = STYLE_PRESETS.find((preset) => preset.id === params.style_preset);
-    return found ?? DEFAULT_PRESET;
-  }, [params.style_preset]);
+  const moodForGeneration = null;
 
-  const moodForGeneration = selectedPreset.id === 'free' ? null : selectedPreset;
+  const updateHairPreference = <K extends keyof HairParameters>(
+    key: K,
+    value: HairParameters[K] | undefined,
+  ) => {
+    setHairPreferences((prev) => {
+      const next = { ...prev } as Partial<HairParameters>;
+      if (value === undefined) {
+        delete next[key];
+      } else {
+        next[key] = value;
+      }
+      return next;
+    });
+  };
+
+  const getLabel = (value: string | undefined, options: { value: string; label: string }[]) => {
+    if (!value) return undefined;
+    return options.find((option) => option.value === value)?.label;
+  };
 
   const handleGenerate = async () => {
     setIsGenerating(true);
@@ -118,15 +137,29 @@ export function GenerateModel() {
     setSelectedIndex(null);
 
     try {
+      const hairSnapshot = { ...hairPreferences };
+      const trimmedNote = customNote.trim();
+      const options = {
+        hairPreferences: hairSnapshot,
+        ...(trimmedNote ? { additionalNote: trimmedNote } : {}),
+        onModelGenerated: (imageUrl: string) => {
+          const baseEntry = {
+            url: imageUrl,
+            params: { ...params },
+            hair: { ...hairSnapshot },
+          };
+          const entry = trimmedNote ? { ...baseEntry, note: trimmedNote } : baseEntry;
+          setGeneratedModels((prev) => [...prev, entry]);
+        },
+      };
+
       await generateCutModels(
         moodForGeneration,
         params.gender,
         params.age_range,
         params.face_type,
         params.count,
-        (imageUrl) => {
-          setGeneratedModels((prev) => [...prev, { url: imageUrl, params: { ...params } }]);
-        },
+        options,
       );
     } catch (error) {
       console.error('Generation failed:', error);
@@ -141,6 +174,15 @@ export function GenerateModel() {
     const selected = generatedModels[selectedIndex];
     if (!selected) return;
 
+    const hairProfile = { ...selected.hair };
+
+    const generationParams: Record<string, unknown> = {
+      hair_preferences: hairProfile,
+    };
+    if (selected.note) {
+      generationParams.custom_note = selected.note;
+    }
+
     const newModel: CutModel = {
       id: `model-${Date.now()}`,
       gender: selected.params.gender,
@@ -148,17 +190,13 @@ export function GenerateModel() {
       face_type: selected.params.face_type,
       image_url: selected.url,
       generation_prompt: '',
-      generation_params: {
-        style_preset: selected.params.style_preset,
-      },
+      generation_params: generationParams,
       synthid_metadata: null,
       is_favorite: false,
-      tags:
-        moodForGeneration && moodForGeneration.id === selected.params.style_preset
-          ? (moodForGeneration.keywords ?? [])
-          : [],
+      tags: [],
       created_at: new Date().toISOString(),
       created_by: 'local-user',
+      hair_profile: hairProfile,
     };
 
     addModel(newModel);
@@ -173,7 +211,9 @@ export function GenerateModel() {
         </Button>
         <div>
           <h1 className="text-3xl font-bold">カットモデル生成</h1>
-          <p className="mt-1 text-gray-600">ムードと基本プロフィールを選んで生成します。</p>
+          <p className="mt-1 text-gray-600">
+            基本プロフィールと補足メモを入力して女性モデルを生成します。
+          </p>
         </div>
       </div>
 
@@ -181,9 +221,9 @@ export function GenerateModel() {
         <div className="flex gap-3">
           <span className="text-2xl">💡</span>
           <div className="space-y-1 text-sm">
-            <p className="font-semibold text-blue-800">ムードを選んで自由に生成</p>
+            <p className="font-semibold text-blue-800">生成ガイド</p>
             <p className="text-blue-700">
-              年齢・性別・顔型に加えてムード（ギャル、モードなど）を選ぶと、カタログに使える多様なモデルを用意できます。
+              現状は「おまかせ」仕様で、女性モデルのみ生成します。雰囲気の微調整は下部のフリーメモに記入してください。
             </p>
           </div>
         </div>
@@ -194,46 +234,10 @@ export function GenerateModel() {
           <h2 className="mb-4 text-lg font-semibold">生成パラメータ</h2>
           <div className="space-y-4">
             <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">
-                ムード・スタイル
-              </label>
-              <div className="grid gap-2 sm:grid-cols-2">
-                {STYLE_PRESETS.map((preset) => {
-                  const isActive = params.style_preset === preset.id;
-                  return (
-                    <Card
-                      key={preset.id}
-                      className={`cursor-pointer border transition ${
-                        isActive ? 'border-blue-500 shadow-sm' : 'hover:border-blue-300'
-                      }`}
-                      onClick={() =>
-                        !isGenerating && setParams((prev) => ({ ...prev, style_preset: preset.id }))
-                      }
-                    >
-                      <div className="p-3">
-                        <p className="font-semibold">{preset.label}</p>
-                        <p className="mt-1 text-xs text-gray-600">{preset.description}</p>
-                      </div>
-                    </Card>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div>
               <label className="mb-2 block text-sm font-medium text-gray-700">性別</label>
-              <div className="flex gap-2">
-                {GENDER_OPTIONS.map((option) => (
-                  <Button
-                    key={option.value}
-                    variant={params.gender === option.value ? 'primary' : 'outline'}
-                    onClick={() => setParams((prev) => ({ ...prev, gender: option.value }))}
-                    disabled={isGenerating}
-                  >
-                    {option.label}
-                  </Button>
-                ))}
-              </div>
+              <p className="rounded border border-dashed border-gray-300 px-3 py-2 text-sm text-gray-600">
+                女性モデルのみを生成します。
+              </p>
             </div>
 
             <div>
@@ -253,6 +257,22 @@ export function GenerateModel() {
             </div>
 
             <div>
+              <label className="mb-2 block text-sm font-medium text-gray-700">
+                人物イメージメモ
+              </label>
+              <textarea
+                className="w-full rounded border border-gray-300 p-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                placeholder="例：柔らかい笑顔で、透明感のある雰囲気。"
+                value={customNote}
+                onChange={(e) => setCustomNote(e.target.value)}
+                rows={3}
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                任意。人物の雰囲気や撮影意図を自由に書けます。
+              </p>
+            </div>
+
+            <div>
               <label className="mb-2 block text-sm font-medium text-gray-700">顔型</label>
               <div className="flex flex-wrap gap-2">
                 {FACE_TYPE_OPTIONS.map((option) => (
@@ -265,6 +285,125 @@ export function GenerateModel() {
                     {option.label}
                   </Button>
                 ))}
+              </div>
+            </div>
+
+            <div className="space-y-4 rounded-md border border-gray-200 p-4">
+              <div className="flex flex-col gap-1">
+                <span className="text-sm font-medium text-gray-700">ベースヘア設定</span>
+                <span className="text-xs text-gray-500">
+                  生成されるモデルの初期ヘア状態をあらかじめ指定できます。
+                </span>
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <p className="text-xs font-semibold text-gray-600">長さ</p>
+                  <div className="mt-1 flex flex-wrap gap-2">
+                    {HAIR_LENGTH_OPTIONS.map((option) => (
+                      <Button
+                        key={option.value}
+                        variant={hairPreferences.length === option.value ? 'primary' : 'outline'}
+                        onClick={() => updateHairPreference('length', option.value)}
+                        disabled={isGenerating}
+                      >
+                        {option.label}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-xs font-semibold text-gray-600">髪量</p>
+                  <div className="mt-1 flex flex-wrap gap-2">
+                    {HAIR_VOLUME_OPTIONS.map((option) => (
+                      <Button
+                        key={option.value}
+                        variant={hairPreferences.volume === option.value ? 'primary' : 'outline'}
+                        onClick={() => updateHairPreference('volume', option.value)}
+                        disabled={isGenerating}
+                      >
+                        {option.label}
+                      </Button>
+                    ))}
+                    <Button
+                      variant={hairPreferences.volume === undefined ? 'primary' : 'outline'}
+                      onClick={() => updateHairPreference('volume', undefined)}
+                      disabled={isGenerating}
+                    >
+                      設定しない
+                    </Button>
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-xs font-semibold text-gray-600">髪質</p>
+                  <div className="mt-1 flex flex-wrap gap-2">
+                    {HAIR_QUALITY_OPTIONS.map((option) => (
+                      <Button
+                        key={option.value}
+                        variant={hairPreferences.quality === option.value ? 'primary' : 'outline'}
+                        onClick={() => updateHairPreference('quality', option.value)}
+                        disabled={isGenerating}
+                      >
+                        {option.label}
+                      </Button>
+                    ))}
+                    <Button
+                      variant={hairPreferences.quality === undefined ? 'primary' : 'outline'}
+                      onClick={() => updateHairPreference('quality', undefined)}
+                      disabled={isGenerating}
+                    >
+                      設定しない
+                    </Button>
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-xs font-semibold text-gray-600">太さ</p>
+                  <div className="mt-1 flex flex-wrap gap-2">
+                    {HAIR_THICKNESS_OPTIONS.map((option) => (
+                      <Button
+                        key={option.value}
+                        variant={hairPreferences.thickness === option.value ? 'primary' : 'outline'}
+                        onClick={() => updateHairPreference('thickness', option.value)}
+                        disabled={isGenerating}
+                      >
+                        {option.label}
+                      </Button>
+                    ))}
+                    <Button
+                      variant={hairPreferences.thickness === undefined ? 'primary' : 'outline'}
+                      onClick={() => updateHairPreference('thickness', undefined)}
+                      disabled={isGenerating}
+                    >
+                      設定しない
+                    </Button>
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-xs font-semibold text-gray-600">クセ</p>
+                  <div className="mt-1 flex flex-wrap gap-2">
+                    {HAIR_TEXTURE_OPTIONS.map((option) => (
+                      <Button
+                        key={option.value}
+                        variant={hairPreferences.texture === option.value ? 'primary' : 'outline'}
+                        onClick={() => updateHairPreference('texture', option.value)}
+                        disabled={isGenerating}
+                      >
+                        {option.label}
+                      </Button>
+                    ))}
+                    <Button
+                      variant={hairPreferences.texture === undefined ? 'primary' : 'outline'}
+                      onClick={() => updateHairPreference('texture', undefined)}
+                      disabled={isGenerating}
+                    >
+                      設定しない
+                    </Button>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -304,12 +443,39 @@ export function GenerateModel() {
             <div className="grid gap-4">
               <div className="grid gap-4 sm:grid-cols-2">
                 {generatedModels.map((model, index) => {
-                  const presetLabel =
-                    STYLE_PRESETS.find((preset) => preset.id === model.params.style_preset)
-                      ?.label ?? 'おまかせ';
                   const ageLabel =
                     AGE_RANGE_OPTIONS.find((option) => option.value === model.params.age_range)
                       ?.label ?? '年齢不明';
+                  const hair = model.hair;
+                  const lengthLabel = getLabel(
+                    hair.length as string | undefined,
+                    HAIR_LENGTH_OPTIONS,
+                  );
+                  const volumeLabel = getLabel(
+                    hair.volume as string | undefined,
+                    HAIR_VOLUME_OPTIONS,
+                  );
+                  const qualityLabel = getLabel(
+                    hair.quality as string | undefined,
+                    HAIR_QUALITY_OPTIONS,
+                  );
+                  const thicknessLabel = getLabel(
+                    hair.thickness as string | undefined,
+                    HAIR_THICKNESS_OPTIONS,
+                  );
+                  const textureLabel = getLabel(
+                    hair.texture as string | undefined,
+                    HAIR_TEXTURE_OPTIONS,
+                  );
+                  const hairSummary = [
+                    lengthLabel && `長さ: ${lengthLabel}`,
+                    volumeLabel && `髪量: ${volumeLabel}`,
+                    qualityLabel && `髪質: ${qualityLabel}`,
+                    thicknessLabel && `太さ: ${thicknessLabel}`,
+                    textureLabel && `クセ: ${textureLabel}`,
+                  ]
+                    .filter(Boolean)
+                    .join(' / ');
 
                   return (
                     <div
@@ -327,7 +493,13 @@ export function GenerateModel() {
                         className="h-64 w-full object-cover"
                       />
                       <div className="p-2 text-xs text-gray-600">
-                        {presetLabel} / {ageLabel}
+                        <div>年齢: {ageLabel}</div>
+                        {hairSummary && (
+                          <div className="mt-1 text-[10px] text-gray-500">{hairSummary}</div>
+                        )}
+                        {model.note && (
+                          <div className="mt-1 text-[10px] text-gray-500">メモ: {model.note}</div>
+                        )}
                       </div>
                     </div>
                   );
