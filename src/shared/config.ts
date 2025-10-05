@@ -1,3 +1,5 @@
+import { env } from './lib/env';
+
 /**
  * Global application configuration
  *
@@ -28,6 +30,9 @@ export const AppConfig = {
   features: {
     enableRealtime: true,
     enableAnalytics: false,
+    catalog: {
+      useSupabase: env.VITE_USE_SUPABASE_CATALOG,
+    },
   },
 
   // Routes

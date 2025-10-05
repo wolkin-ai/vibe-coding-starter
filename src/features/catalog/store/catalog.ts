@@ -16,11 +16,14 @@ interface CatalogStore {
 
   // Actions - Model
   setCurrentModel: (model: CutModel | null) => void;
-  addModel: (model: CutModel) => void;
+  setModels: (models: CutModel[]) => void;
+  upsertModels: (models: CutModel[]) => void;
   toggleModelFavorite: (id: string) => void;
   removeModel: (id: string) => void;
 
   // Actions - Style
+  setStyles: (styles: HairStyle[]) => void;
+  upsertStyles: (styles: HairStyle[]) => void;
   addStyle: (style: HairStyle) => void;
   updateStyle: (id: string, updates: Partial<HairStyle>) => void;
   toggleStyleFavorite: (id: string) => void;
@@ -52,12 +55,22 @@ export const useCatalogStore = create<CatalogStore>((set, get) => ({
   // Model actions
   setCurrentModel: (model) => set({ currentModel: model }),
 
-  addModel: (model) =>
+  setModels: (models) =>
+    set(() => ({
+      models,
+      favoriteModels: models.filter((model) => model.is_favorite),
+    })),
+
+  upsertModels: (incoming) =>
     set((state) => {
-      const models = [...state.models, model];
-      const favoriteModels = model.is_favorite
-        ? [...state.favoriteModels, model]
-        : state.favoriteModels;
+      const merged = new Map(state.models.map((model) => [model.id, model] as const));
+      incoming.forEach((model) => {
+        merged.set(model.id, model);
+      });
+      const models = Array.from(merged.values()).sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+      );
+      const favoriteModels = models.filter((model) => model.is_favorite);
       return { models, favoriteModels };
     }),
 
@@ -77,6 +90,25 @@ export const useCatalogStore = create<CatalogStore>((set, get) => ({
     })),
 
   // Style actions
+  setStyles: (styles) =>
+    set(() => ({
+      styles,
+      catalogStyles: styles.filter((style) => style.status === 'approved'),
+    })),
+
+  upsertStyles: (incoming) =>
+    set((state) => {
+      const merged = new Map(state.styles.map((style) => [style.id, style] as const));
+      incoming.forEach((style) => {
+        merged.set(style.id, style);
+      });
+      const styles = Array.from(merged.values()).sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+      );
+      const catalogStyles = styles.filter((style) => style.status === 'approved');
+      return { styles, catalogStyles };
+    }),
+
   addStyle: (style) =>
     set((state) => {
       const styles = [...state.styles, style];

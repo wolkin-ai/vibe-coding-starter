@@ -60,6 +60,163 @@ export type Database = {
         };
         Relationships: [];
       };
+      catalog_cut_models: {
+        Row: {
+          age_range: string;
+          created_at: string;
+          created_by: string;
+          expression: string | null;
+          face_type: string | null;
+          gender: string;
+          hair_profile: Json;
+          id: string;
+          image_url: string;
+          is_favorite: boolean;
+          seed: string | null;
+          skin_tone: string | null;
+          storage_path: string;
+          synthid_metadata: Json | null;
+          tags: string[];
+          thumbnail_url: string | null;
+          generation_params: Json;
+          generation_prompt: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          age_range: string;
+          created_at?: string;
+          created_by: string;
+          expression?: string | null;
+          face_type?: string | null;
+          gender: string;
+          hair_profile?: Json;
+          id?: string;
+          image_url: string;
+          is_favorite?: boolean;
+          seed?: string | null;
+          skin_tone?: string | null;
+          storage_path: string;
+          synthid_metadata?: Json | null;
+          tags?: string[];
+          thumbnail_url?: string | null;
+          generation_params?: Json;
+          generation_prompt?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          age_range?: string;
+          created_at?: string;
+          created_by?: string;
+          expression?: string | null;
+          face_type?: string | null;
+          gender?: string;
+          hair_profile?: Json;
+          id?: string;
+          image_url?: string;
+          is_favorite?: boolean;
+          seed?: string | null;
+          skin_tone?: string | null;
+          storage_path?: string;
+          synthid_metadata?: Json | null;
+          tags?: string[];
+          thumbnail_url?: string | null;
+          generation_params?: Json;
+          generation_prompt?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'catalog_cut_models_created_by_fkey';
+            columns: ['created_by'];
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+            referencedSchema: 'auth';
+          },
+        ];
+      };
+      catalog_hair_styles: {
+        Row: {
+          approved_at: string | null;
+          created_at: string;
+          created_by: string;
+          cut_model_id: string | null;
+          description: string | null;
+          generation_job_id: string | null;
+          generation_params: Json | null;
+          generation_prompt: string | null;
+          id: string;
+          image_url: string;
+          is_favorite: boolean;
+          parameters: Json;
+          reference_image_url: string | null;
+          status: 'draft' | 'reviewing' | 'approved' | 'archived';
+          storage_path: string;
+          synthid_metadata: Json | null;
+          tags: string[];
+          thumbnail_url: string | null;
+          title: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          approved_at?: string | null;
+          created_at?: string;
+          created_by: string;
+          cut_model_id?: string | null;
+          description?: string | null;
+          generation_job_id?: string | null;
+          generation_params?: Json | null;
+          generation_prompt?: string | null;
+          id?: string;
+          image_url: string;
+          is_favorite?: boolean;
+          parameters: Json;
+          reference_image_url?: string | null;
+          status?: 'draft' | 'reviewing' | 'approved' | 'archived';
+          storage_path: string;
+          synthid_metadata?: Json | null;
+          tags?: string[];
+          thumbnail_url?: string | null;
+          title?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          approved_at?: string | null;
+          created_at?: string;
+          created_by?: string;
+          cut_model_id?: string | null;
+          description?: string | null;
+          generation_job_id?: string | null;
+          generation_params?: Json | null;
+          generation_prompt?: string | null;
+          id?: string;
+          image_url?: string;
+          is_favorite?: boolean;
+          parameters?: Json;
+          reference_image_url?: string | null;
+          status?: 'draft' | 'reviewing' | 'approved' | 'archived';
+          storage_path?: string;
+          synthid_metadata?: Json | null;
+          tags?: string[];
+          thumbnail_url?: string | null;
+          title?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'catalog_hair_styles_created_by_fkey';
+            columns: ['created_by'];
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+            referencedSchema: 'auth';
+          },
+          {
+            foreignKeyName: 'catalog_hair_styles_cut_model_id_fkey';
+            columns: ['cut_model_id'];
+            referencedRelation: 'catalog_cut_models';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       salon_projects: {
         Row: {
           created_at: string;

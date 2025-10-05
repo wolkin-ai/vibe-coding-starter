@@ -33,6 +33,8 @@ export interface CutModel {
   generation_params: Record<string, unknown>; // 生成時のパラメータ
   generation_prompt?: string;
   synthid_metadata?: unknown;
+  storage_path?: string;
+  updated_at?: string;
 
   // メタデータ
   is_favorite: boolean; // お気に入り
@@ -116,6 +118,7 @@ export interface HairStyle {
   // 生成結果
   image_url: string;
   thumbnail_url?: string;
+  storage_path?: string;
   generation_params?: Record<string, unknown>;
   generation_prompt?: string;
   synthid_metadata?: unknown;
@@ -132,6 +135,7 @@ export interface HairStyle {
   generation_job_id: string;
   created_at: string;
   created_by: string;
+  updated_at?: string;
 }
 
 // ============================================================================

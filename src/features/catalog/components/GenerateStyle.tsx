@@ -2,6 +2,14 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../../../shared/ui/Button';
 import { Card } from '../../../shared/ui/Card';
+import { features as appFeatures } from '@/shared/config';
+
+import {
+  useCatalogModelsQuery,
+  useCatalogStylesQuery,
+  useSaveCatalogStylesMutation,
+  type SaveCatalogStyleInput,
+} from '../hooks';
 import { useCatalogStore } from '../store/catalog';
 import {
   generateStyleWithModel,
@@ -18,7 +26,7 @@ import type {
   HairThickness,
   BangsStyle,
   HairColorType,
-  HairStyle,
+  HairStyleStatus,
 } from '../types';
 
 type MoodPreset = StyleMoodHint & { description: string };
@@ -146,7 +154,10 @@ const MODE_LABELS: Record<GenerationMode, { title: string; desc: string }> = {
 
 export function GenerateStyle() {
   const navigate = useNavigate();
-  const { getAllModels, addStyle } = useCatalogStore();
+  const { getAllModels } = useCatalogStore();
+  useCatalogModelsQuery();
+  const { isSupabaseEnabled: isStyleSupabase } = useCatalogStylesQuery();
+  const saveStylesMutation = useSaveCatalogStylesMutation();
   const models = getAllModels();
 
   const [mode, setMode] = useState<GenerationMode>('with-model');
@@ -172,6 +183,7 @@ export function GenerateStyle() {
     [],
   );
   const [selectedIndexes, setSelectedIndexes] = useState<Set<number>>(new Set());
+  const [hasSaved, setHasSaved] = useState(false);
 
   const selectedPreset = useMemo<MoodPreset>(() => {
     const found = STYLE_PRESETS.find((preset) => preset.id === selectedPresetId);
@@ -205,6 +217,7 @@ export function GenerateStyle() {
     setIsGenerating(true);
     setGeneratedStyles([]);
     setSelectedIndexes(new Set());
+    setHasSaved(false);
 
     try {
       if (mode === 'with-model' && selectedModelId) {
@@ -240,46 +253,68 @@ export function GenerateStyle() {
     }
   };
 
-  const handleSaveStyles = () => {
-    if (selectedIndexes.size === 0) return;
+  const handleSaveStyles = async () => {
+    if (selectedIndexes.size === 0 || saveStylesMutation.isPending) return;
 
     const paramsSnapshot: HairParameters = { ...hairParams };
+    const generationJobBase = `style-job-${Date.now()}`;
+    let localReferenceUrl: string | undefined;
 
-    selectedIndexes.forEach((index) => {
+    if (!isStyleSupabase && mode === 'style-transfer' && referenceImage) {
+      localReferenceUrl = URL.createObjectURL(referenceImage);
+    }
+
+    const payloads = Array.from(selectedIndexes).flatMap((index) => {
       const style = generatedStyles[index];
-      if (!style) return;
+      if (!style) return [];
 
       const snapshot: HairParameters = { ...paramsSnapshot };
 
-      const newStyle: HairStyle = {
-        id: `style-${Date.now()}-${index}`,
+      const payload: SaveCatalogStyleInput = {
+        imageUrl: style.url,
         parameters: snapshot,
-        image_url: style.url,
         status: 'draft',
-        is_favorite: false,
         tags: moodForGeneration?.keywords ?? [],
-        generation_params: {
+        generationParams: {
           style_preset: selectedPresetId,
           hair_parameters: snapshot,
         },
-        generation_prompt: '',
-        generation_job_id: `job-${Date.now()}`,
-        created_at: new Date().toISOString(),
-        created_by: 'local-user',
-        approved_at: null,
+        generationPrompt: '',
+        generationJobId: `${generationJobBase}-${index}`,
       };
 
       if (style.modelId) {
-        newStyle.cut_model_id = style.modelId;
+        payload.cutModelId = style.modelId;
       }
-      if (mode === 'style-transfer' && referenceImage) {
-        newStyle.reference_image_url = URL.createObjectURL(referenceImage);
+      if (mode === 'style-transfer' && referenceImage && isStyleSupabase) {
+        payload.referenceImageFile = referenceImage;
+      }
+      if (mode === 'style-transfer' && referenceImage && !isStyleSupabase && localReferenceUrl) {
+        payload.referenceImageUrl = localReferenceUrl;
       }
 
-      addStyle(newStyle);
+      return [payload];
     });
 
-    navigate('/catalog');
+    if (payloads.length === 0) {
+      if (localReferenceUrl) {
+        URL.revokeObjectURL(localReferenceUrl);
+      }
+      return;
+    }
+
+    try {
+      await saveStylesMutation.mutateAsync(payloads);
+      setHasSaved(true);
+      setSelectedIndexes(new Set());
+    } catch (error) {
+      console.error('スタイル保存に失敗しました:', error);
+      alert(error instanceof Error ? error.message : 'スタイルの保存に失敗しました');
+    } finally {
+      if (localReferenceUrl) {
+        URL.revokeObjectURL(localReferenceUrl);
+      }
+    }
   };
 
   const toggleSelection = (index: number) => {
@@ -781,13 +816,23 @@ export function GenerateStyle() {
                 })}
               </div>
 
-              <Button
-                className="h-12 w-full"
-                onClick={handleSaveStyles}
-                disabled={selectedIndexes.size === 0}
-              >
-                選択したスタイルを保存
-              </Button>
+              <div className="flex flex-col gap-3 md:flex-row">
+                <Button
+                  className="h-12 flex-1"
+                  onClick={handleSaveStyles}
+                  disabled={selectedIndexes.size === 0 || saveStylesMutation.isPending}
+                >
+                  {saveStylesMutation.isPending ? '保存中...' : '選択したスタイルを保存'}
+                </Button>
+                <Button
+                  className="h-12 flex-1"
+                  variant="outline"
+                  onClick={() => navigate('/catalog')}
+                  disabled={!hasSaved}
+                >
+                  カタログへ
+                </Button>
+              </div>
             </div>
           )}
         </Card>

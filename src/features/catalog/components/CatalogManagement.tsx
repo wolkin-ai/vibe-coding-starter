@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../../../shared/ui/Button';
 import { Card } from '../../../shared/ui/Card';
+import { useCatalogModelsQuery, useCatalogStylesQuery } from '../hooks';
 import { useCatalogStore } from '../store/catalog';
 import type {
   CutModel,
@@ -115,6 +116,18 @@ export function CatalogManagement() {
   const navigate = useNavigate();
   const { styles, models, updateStyle, approveStyle, removeStyle, getModelStyles } =
     useCatalogStore();
+  const {
+    isLoading: isLoadingModels,
+    isError: isModelsError,
+    error: modelsError,
+    refetch: refetchModels,
+  } = useCatalogModelsQuery();
+  const {
+    isLoading: isLoadingStyles,
+    isError: isStylesError,
+    error: stylesError,
+    refetch: refetchStyles,
+  } = useCatalogStylesQuery();
 
   const [activeTab, setActiveTab] = useState<CatalogTab>('styles');
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
@@ -301,7 +314,21 @@ export function CatalogManagement() {
             </div>
           </Card>
 
-          {filteredStyles.length === 0 ? (
+          {isLoadingStyles ? (
+            <Card className="p-6 text-center text-gray-500">スタイル情報を読み込み中です...</Card>
+          ) : isStylesError ? (
+            <Card className="border-red-200 bg-red-50 p-4 text-sm text-red-700">
+              <div className="flex items-center justify-between">
+                <p>
+                  スタイルの取得に失敗しました:{' '}
+                  {stylesError instanceof Error ? stylesError.message : '不明なエラー'}
+                </p>
+                <Button variant="outline" size="sm" onClick={() => refetchStyles()}>
+                  再読み込み
+                </Button>
+              </div>
+            </Card>
+          ) : filteredStyles.length === 0 ? (
             <Card className="flex flex-col items-center justify-center gap-4 p-12 text-center text-gray-600">
               <div className="flex h-16 w-16 items-center justify-center rounded-full bg-blue-50 text-blue-500">
                 📸
@@ -436,7 +463,19 @@ export function CatalogManagement() {
           <div className="grid gap-6 lg:grid-cols-[minmax(0,320px)_1fr]">
             <Card className="p-4">
               <h2 className="mb-3 text-lg font-semibold">モデル一覧</h2>
-              {models.length === 0 ? (
+              {isLoadingModels ? (
+                <p className="text-sm text-gray-500">モデル情報を読み込み中です...</p>
+              ) : isModelsError ? (
+                <div className="space-y-3 text-sm text-red-600">
+                  <p>
+                    モデルの取得に失敗しました:{' '}
+                    {modelsError instanceof Error ? modelsError.message : '不明なエラー'}
+                  </p>
+                  <Button variant="outline" size="sm" onClick={() => refetchModels()}>
+                    再読み込み
+                  </Button>
+                </div>
+              ) : models.length === 0 ? (
                 <p className="text-sm text-gray-500">保存済みのモデルがありません。</p>
               ) : (
                 <div className="space-y-3">

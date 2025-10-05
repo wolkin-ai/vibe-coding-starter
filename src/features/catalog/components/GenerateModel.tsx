@@ -2,10 +2,9 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../../../shared/ui/Button';
 import { Card } from '../../../shared/ui/Card';
-import { useCatalogStore } from '../store/catalog';
+import { useSaveCatalogModelsMutation, useCatalogModelsQuery } from '../hooks';
 import { generateCutModels } from '../api/gemini';
 import type {
-  CutModel,
   HairParameters,
   HairLength,
   HairQuality,
@@ -87,7 +86,8 @@ interface GeneratedModelEntry {
 
 export function GenerateModel() {
   const navigate = useNavigate();
-  const { addModel } = useCatalogStore();
+  useCatalogModelsQuery();
+  const saveModelsMutation = useSaveCatalogModelsMutation();
 
   const [params, setParams] = useState<GenerationParams>({
     gender: 'female',
@@ -137,6 +137,7 @@ export function GenerateModel() {
     setIsGenerating(true);
     setGeneratedModels([]);
     setSelectedIndexes(new Set());
+    setHasSaved(false);
 
     try {
       const hairSnapshot = { ...hairPreferences };
@@ -173,18 +174,16 @@ export function GenerateModel() {
     }
   };
 
-  const handleSaveModel = () => {
-    if (selectedIndexes.size === 0) return;
+  const [hasSaved, setHasSaved] = useState(false);
 
-    const timestamp = Date.now();
-    let offset = 0;
+  const handleSaveModel = async () => {
+    if (selectedIndexes.size === 0 || saveModelsMutation.isPending) return;
 
-    selectedIndexes.forEach((index) => {
+    const payloads = Array.from(selectedIndexes).flatMap((index) => {
       const selected = generatedModels[index];
-      if (!selected) return;
+      if (!selected) return [];
 
       const hairProfile = { ...selected.hair };
-
       const generationParams: Record<string, unknown> = {
         hair_preferences: hairProfile,
       };
@@ -192,26 +191,33 @@ export function GenerateModel() {
         generationParams.custom_note = selected.note;
       }
 
-      const newModel: CutModel = {
-        id: `model-${timestamp}-${offset}`,
-        gender: selected.params.gender,
-        age_range: selected.params.age_range,
-        face_type: selected.params.face_type,
-        image_url: selected.url,
-        generation_prompt: '',
-        generation_params: generationParams,
-        synthid_metadata: null,
-        is_favorite: false,
-        tags: [],
-        created_at: new Date().toISOString(),
-        created_by: 'local-user',
-        hair_profile: hairProfile,
-      };
-
-      addModel(newModel);
-      offset += 1;
+      return [
+        {
+          imageUrl: selected.url,
+          gender: selected.params.gender,
+          ageRange: selected.params.age_range,
+          faceType: selected.params.face_type,
+          hairProfile,
+          generationParams,
+          generationPrompt: '',
+          tags: [],
+        },
+      ];
     });
 
+    if (payloads.length === 0) return;
+
+    try {
+      await saveModelsMutation.mutateAsync(payloads);
+      setHasSaved(true);
+      setSelectedIndexes(new Set());
+    } catch (error) {
+      console.error('モデル保存に失敗しました:', error);
+      alert(error instanceof Error ? error.message : 'モデルの保存に失敗しました');
+    }
+  };
+
+  const handleGoToCatalog = () => {
     navigate('/catalog');
   };
 
@@ -608,13 +614,23 @@ export function GenerateModel() {
                 })}
               </div>
 
-              <Button
-                className="h-12 w-full"
-                onClick={handleSaveModel}
-                disabled={selectedIndexes.size === 0}
-              >
-                選択したモデルを保存
-              </Button>
+              <div className="flex flex-col gap-3 md:flex-row">
+                <Button
+                  className="h-12 flex-1"
+                  onClick={handleSaveModel}
+                  disabled={selectedIndexes.size === 0 || saveModelsMutation.isPending}
+                >
+                  {saveModelsMutation.isPending ? '保存中...' : '選択したモデルを保存'}
+                </Button>
+                <Button
+                  className="h-12 flex-1"
+                  variant="outline"
+                  onClick={handleGoToCatalog}
+                  disabled={!hasSaved}
+                >
+                  一覧へ進む
+                </Button>
+              </div>
             </div>
           )}
         </Card>

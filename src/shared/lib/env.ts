@@ -4,6 +4,11 @@ const envSchema = z.object({
   VITE_SUPABASE_URL: z.string().url('Invalid Supabase URL'),
   VITE_SUPABASE_ANON_KEY: z.string().min(1, 'Supabase anon key is required'),
   VITE_APP_NAME: z.string().optional().default('Vibe Coding Starter'),
+  VITE_USE_SUPABASE_CATALOG: z
+    .union([z.literal('true'), z.literal('false')])
+    .optional()
+    .default('true')
+    .transform((value) => value === 'true'),
 });
 
 export const env = envSchema.parse(import.meta.env);

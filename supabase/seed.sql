@@ -155,3 +155,37 @@ VALUES
     timezone('utc', now()) - interval '4 days'
   )
 ON CONFLICT (id) DO NOTHING;
+
+-- Seed catalog cut models
+INSERT INTO public.catalog_cut_models (
+    id,
+    gender,
+    age_range,
+    face_type,
+    hair_profile,
+    image_url,
+    storage_path,
+    generation_params,
+    is_favorite,
+    tags,
+    created_by,
+    created_at,
+    updated_at
+  )
+VALUES
+  (
+    '00000000-0000-0000-0000-000000000601'::uuid,
+    'female',
+    '20s',
+    'oval',
+    '{"length": "medium", "texture": "slight"}'::jsonb,
+    'https://placehold.co/800x1000/f5f5f5/222?text=Catalog+Model+1',
+    'seed/catalog-models/original-1.png',
+    '{"custom_note": "柔らかい雰囲気"}'::jsonb,
+    false,
+    ARRAY['featured']::text[],
+    '11111111-1111-1111-1111-111111111111'::uuid,
+    timezone('utc', now()) - interval '7 days',
+    timezone('utc', now()) - interval '7 days'
+  )
+ON CONFLICT (id) DO NOTHING;
